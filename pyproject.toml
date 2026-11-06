@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "universal-url-extractor"
+version = "0.3.0"
+description = "Local-first URL extraction API with modular Crawl4AI, Agent Reach, and Docling adapters"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110,<1.0",
+  "uvicorn>=0.29,<1.0",
+  "httpx>=0.27,<1.0",
+  "beautifulsoup4>=4.12,<5.0",
+]
+
+[project.optional-dependencies]
+crawl = ["crawl4ai>=0.7,<1.0"]
+documents = ["docling>=2.0,<3.0"]
+readability = ["trafilatura>=2.0,<3.0"]
+evaluation = ["openai>=2.8,<4.0"]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.23,<2.0"]
+all = ["crawl4ai>=0.7,<1.0", "docling>=2.0,<3.0", "trafilatura>=2.0,<3.0"]
+
+[project.scripts]
+universal-extractor = "universal_extractor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

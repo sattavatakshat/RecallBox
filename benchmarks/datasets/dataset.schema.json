@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Universal Extraction Benchmark Dataset Entry v0.3",
+  "type": "object",
+  "required": ["url", "category"],
+  "additionalProperties": false,
+  "properties": {
+    "url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+    "category": {"enum": ["article", "javascript", "youtube", "instagram", "reddit", "pdf"]},
+    "reference_artifact": {"type": ["string", "null"], "description": "Relative path below the dataset directory"},
+    "expected_metadata": {"type": "object", "additionalProperties": {"type": "string"}},
+    "permissions_notes": {"type": ["string", "null"]},
+    "reference_verified": {"type": "boolean", "default": false},
+    "reference_verifier": {"type": ["string", "null"]},
+    "expected_limitations": {"type": "array", "items": {"type": "string"}},
+    "tags": {"type": "array", "items": {"type": "string"}}
+  }
+}

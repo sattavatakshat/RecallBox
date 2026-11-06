@@ -1,0 +1,3 @@
+# Intentionally unpopulated. Add eight authorized, human-reviewed URLs for each of
+# article, javascript, youtube, instagram, reddit, and pdf (48 total).
+# Every non-comment line must validate against dataset.schema.json.

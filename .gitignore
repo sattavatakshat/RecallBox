@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.env
+.benchmark_lab/
+storage-backups/
+beta-evidence/
+training-exports/
+.DS_Store
+
+# Generated benchmark output may contain sensitive or proprietary source data
+benchmarks/private_map*.jsonl
+benchmarks/review_packet*.jsonl
+benchmarks/ai_reviews*.jsonl
+benchmarks/*scores*.csv
+benchmarks/*summary*.csv
