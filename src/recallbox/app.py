@@ -14,6 +14,8 @@ from .auth import denied, digest, issue, principal
 from .config import Settings
 from .db import connect, owned
 from .identity import IdentityRejected, IdentityVerifier
+from .memories import router as memory_router
+from .problems import Problem
 
 logger = logging.getLogger('recallbox')
 
@@ -68,11 +70,11 @@ def create_app():
             if count > 20:
                 return error(request, 429, 'rate_limited', {'Retry-After': '60'})
         # Check actual streamed bytes before JSON parsing, including chunked requests.
-        if request.method == 'POST':
+        if request.method in ('POST', 'PATCH'):
             data = bytearray()
             async for chunk in request.stream():
                 data.extend(chunk)
-                if len(data) > 16384:
+                if len(data) > (16384 if request.url.path.startswith('/v1/auth/') else 262144):
                     return error(request, 413, 'request_too_large')
             request._body = bytes(data)
         try:
@@ -92,6 +94,12 @@ def create_app():
                             status_code=status, headers={'Cache-Control': 'no-store',
                             'X-Content-Type-Options': 'nosniff', 'X-Request-ID': request.state.request_id,
                             **(headers or {})})
+
+    @app.exception_handler(Problem)
+    async def product_error(request, exc):
+        response = error(request, exc.status, exc.code)
+        return JSONResponse({'error': {'code': exc.code, 'request_id': request.state.request_id, **exc.details}},
+                            status_code=exc.status, headers={k: v for k, v in response.headers.items() if k.lower() != 'content-length'})
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request, exc):
@@ -168,4 +176,5 @@ def create_app():
             raise denied()
         return dict(row)
 
+    app.include_router(memory_router)
     return app
