@@ -1,10 +1,58 @@
-import { useState } from 'react';
-import { useSession } from '../../src/session';
-import { Button, Notice, Screen, Type } from '../../src/ui';
-export default function Account() {
-  const {account, logout, message, retry} = useSession();
-  const [busy, setBusy] = useState(false);
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useFocusEffect } from 'expo-router';
+import { MemorySummary } from '../../src/api';
+import { errorMessage, useMemories } from '../../src/memories';
+import { Button, Notice, TextAction, Type, tokens, usePalette } from '../../src/ui';
+
+export default function Inbox() {
+  const store = useMemories();
+  const p = usePalette();
+  const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState('');
-  async function leave() { setBusy(true); try { await logout(); } catch { setError('Could not revoke your session. Reconnect and try signing out again.'); } finally { setBusy(false); } }
-  return <Screen><Type>YOUR RECALLBOX</Type><Type title>{account?.display_name ?? 'Welcome home.'}</Type><Type muted>You’re signed in to your personal space.</Type><Type>Account created {account ? new Date(account.created_at).toLocaleDateString() : ''}</Type><Notice>{message || error}</Notice>{message && <Button label="Reconnect" onPress={() => void retry()}/>}<Button label="Sign out of this device" onPress={() => void leave()} busy={busy}/></Screen>;
+  useFocusEffect(useCallback(() => { void store.sync(); }, [store.sync]));
+  async function toggle(note: MemorySummary, field: 'starred' | 'archived') {
+    if (working) return;
+    setWorking(note.id); setError('');
+    try { await store.edit(note.id, {expected_version: note.version, [field]: !note[field]}); }
+    catch (cause) { setError(errorMessage(cause)); void store.sync(); }
+    finally { setWorking(null); }
+  }
+  return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}>
+    <FlatList data={store.items} keyExtractor={note => note.id}
+      contentContainerStyle={{padding: 28, gap: 20, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
+      refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
+      ListHeaderComponent={<View style={{gap: 20}}>
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
+          <Type>RECALLBOX</Type><TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
+        </View>
+        <Type title>{store.archived ? 'Tucked away.' : 'Your little library.'}</Type>
+        <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A thought, a detail, a little thing worth keeping.'}</Type>
+        <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
+        <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
+          onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
+        {(store.error || error) && <Notice>{store.error || error}</Notice>}
+        {!!store.notice && <Notice>{store.notice}</Notice>}
+      </View>}
+      ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
+        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Begin with one thought.'}</Type>
+          <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Write your first note. It will be saved privately to your account.'}</Type>
+          {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
+      renderItem={({item}) => <View style={{borderWidth: 1, borderColor: p.line, borderRadius: tokens.radius, padding: 20, gap: 12}}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || 'Untitled note'}`}
+          style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
+          <Type>{item.starred ? '★  ' : ''}{item.title || 'Untitled note'}</Type>
+          <Type muted>{item.preview}</Type>
+          <Type muted>{new Date(item.created_at).toLocaleDateString()}</Type>
+        </Pressable>
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
+          <TextAction label={item.starred ? 'Unstar' : 'Star'} disabled={Boolean(working)} onPress={() => void toggle(item, 'starred')}/>
+          <TextAction label={item.archived ? 'Move to inbox' : 'Archive'} disabled={Boolean(working)} onPress={() => void toggle(item, 'archived')}/>
+        </View>
+      </View>}
+      ListFooterComponent={store.hasMore ? <Button label="Load earlier notes" busy={store.loading}
+        onPress={() => void store.more().catch(() => undefined)}/> : <View style={{height: 16}}/>}
+    />
+  </SafeAreaView>;
 }

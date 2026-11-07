@@ -21,6 +21,13 @@ export function Button({label, onPress, busy = false, disabled = false}: {label:
 }
 export function Input({label, ...props}: TextInputProps & {label: string}) {
   const p = usePalette();
-  return <View style={{gap: 8}}><Type>{label}</Type><TextInput accessibilityLabel={label} {...props} style={{borderWidth: 1, borderColor: p.line, borderRadius: tokens.radius, minHeight: 56, padding: 16, color: p.ink, fontSize: 17}} /></View>;
+  return <View style={{gap: 8}}><Type>{label}</Type><TextInput accessibilityLabel={label} {...props} style={[{borderWidth: 1, borderColor: p.line, borderRadius: tokens.radius, minHeight: 56, padding: 16, color: p.ink, fontSize: 17}, props.style]} /></View>;
 }
 export function Notice({children}: React.PropsWithChildren) { return <View accessibilityLiveRegion="polite"><Type muted>{children}</Type></View>; }
+export function TextAction({label, onPress, disabled = false}: {label: string; onPress: () => void; disabled?: boolean}) {
+  const p = usePalette();
+  return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled}
+    onPress={onPress} style={{minHeight: 48, paddingVertical: 12, paddingHorizontal: 8, justifyContent: 'center', opacity: disabled ? 0.5 : 1}}>
+    <Text style={{color: p.ink, fontSize: 16, fontWeight: '600'}}>{label}</Text>
+  </Pressable>;
+}
