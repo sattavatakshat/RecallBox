@@ -160,16 +160,14 @@ was restored to its original contents. Metro actually started with
 confirmed a **127.0.0.1-only** listener. Metro was stopped after verification;
 no backend or Metro process remains running.
 
-ADB worked outside sandbox restrictions and reported **no connected devices**.
-The existing ARM64 `Medium_Phone_API_36.1` emulator image is available, but no
-emulator was booted and no native UI acceptance is claimed. Android Studio's
-bundled ARM64 JDK **21.0.9** is usable (the shell's default Java discovery instead
-reports Java 8). Installed Android platforms/build tools stop at 36.1; the pinned
-Expo 58 / React Native 0.88.1 native files require compile SDK **37**, build tools
-**37.0.0**, NDK **27.1.12297006** (already present), and Gradle **9.4.1**.
-SDK manager confirms `platforms;android-37.0` and `build-tools;37.0.0` are available.
-Approval for these two SDK packages and online build dependencies was requested
-but has not yet been received; they were not installed.
+ADB worked outside sandbox restrictions; **no physical device** was connected.
+After the operator explicitly approved the missing Android packages and online
+build dependencies, installed **Platform 37.0 revision 2** and **Build Tools
+37.0.0**. Existing SDKs and the ARM64 `Medium_Phone_API_36.1` image were retained.
+Android Studio's bundled ARM64 JDK **21.0.9** is usable (the shell's default Java
+discovery instead reports Java 8). The build uses compile SDK **37**, target SDK
+**36**, min SDK **24**, existing NDK **27.1.12297006**, and Gradle **9.4.1**.
+`aapt2 version` and installed package metadata verified the new tooling.
 
 The actual ARM64 debug build command was:
 
@@ -177,40 +175,108 @@ The actual ARM64 debug build command was:
 cd /Users/akshat/Desktop/RecallBox/apps/mobile/android
 JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' \
 ANDROID_HOME=/Users/akshat/Library/Android/sdk \
-./gradlew :app:assembleDebug --offline --no-daemon --max-workers=2 \
+./gradlew :app:assembleDebug --no-daemon --max-workers=2 \
   -PreactNativeArchitectures=arm64-v8a \
-  -Dorg.gradle.jvmargs='-Xmx1536m -XX:MaxMetaspaceSize=512m'
+  -Dorg.gradle.jvmargs='-Xmx1536m -XX:MaxMetaspaceSize=512m' \
+  -Dorg.gradle.parallel=false --console=plain
 ```
 
-The Gradle 9.4.1 wrapper downloaded successfully. Compilation stopped at native
-plugin resolution because `org.gradle.toolchains.foojay-resolver-convention:1.0.0`
-is not cached. **No APK was produced/installed and no app was launched.** After
-approved SDK/dependency installation, rerun online; do not downgrade the pinned
-application to fit cached tooling. Inbox navigation, real note creation/editing,
-secure restoration, physical-device connectivity and signing remain unverified.
+The earlier offline attempt stopped on uncached Foojay plugin 1.0.0. The approved
+online attempt resolved it and **BUILD SUCCESSFUL in 41m 36s**, with **463 tasks
+executed**. Much of the first build involved dependency downloads, including
+React Native's 275 MiB and Hermes' 112 MiB debug archives. Existing pinned npm
+versions/lockfile and application source were unchanged. Gradle/AGP/native modules
+emit deprecation warnings; no dependency downgrade or node_modules patch was used.
+
+APK: `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`, approximately
+**87 MiB**, package `app.recallbox.mobile`, version `0.1.0`, **arm64-v8a** only.
+SHA-256: `b506b481db1ace1d3f3a37d74504832cd980c33b68239a16aa7e8c43c90dc8e5`.
+Debug signing passed; this is not a release-signed artifact.
+
+Booted the existing emulator without loading/saving snapshots or wiping data.
+Android enforced **2 GiB guest RAM** despite an initial 1.5 GiB request. Stopped it
+during dependency downloads to reduce memory pressure, then restarted for launch.
+`adb install -r` returned **Success**. Android reported a successful cold launch
+of `.MainActivity`; Metro bundled **1,322 modules**. The server was started in
+watch mode with `EXPO_NO_TELEMETRY=1 EXPO_PUBLIC_API_URL=http://127.0.0.1:8001 npx
+expo start --dev-client --localhost --max-workers 2`. Its listener was verified
+as `127.0.0.1:8081`. ADB reverse mappings for 8081 and 8001 were verified. The
+product API remains stopped awaiting OIDC; API connectivity success is not claimed.
+
+Actual native UI evidence, inspected screenshots and UI hierarchy:
+
+- Welcome renders and its primary button opens sign-in.
+- Sign-in displays the provider-setup message; the actual sign-in button is
+  disabled while real public client configuration is absent.
+- With JavaScript fully loaded, the native custom-scheme callback opens the safe
+  recovery screen; Continue returns to sign-in without creating a session.
+- A signed-out `app.recallbox.mobile://new` deep link redirects to sign-in.
+- **Limitation:** a cold custom-scheme callback opens Expo's development launcher,
+  not the recovery route. Sending a second link while a runtime was still starting
+  also triggered Expo's `App react context shouldn't be created before` exception.
+  The warm probe was repeated after confirming load and passed. No upstream patch
+  was applied; cold/startup-race behavior and real provider callbacks remain gates.
+
+Private, Git-ignored screenshot evidence is under `beta-evidence/s25-android/`:
+`welcome.png`, `sign-in.png`, `cold-callback.png`, `warm-callback.png`, and
+`protected-route.png`. Inbox navigation, real note creation/editing, secure session
+restoration, real provider/browser return, physical-device access and release/iOS
+signing remain **unverified**. No real authenticated account is available yet.
+
+To start the existing emulator visibly, use a separate terminal:
+
+```sh
+"$HOME/Library/Android/sdk/emulator/emulator" -avd Medium_Phone_API_36.1 \
+  -no-snapshot-load -no-snapshot-save -memory 2048 -cores 2 -no-audio
+```
+
+With Metro running using the earlier command and the emulator booted, install/open
+the cached APK from another terminal (set the JDK/SDK/PATH as above):
+
+```sh
+cd /Users/akshat/Desktop/RecallBox
+adb -s emulator-5554 install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 reverse tcp:8081 tcp:8081
+adb -s emulator-5554 reverse tcp:8001 tcp:8001
+adb -s emulator-5554 shell am start -W -a android.intent.action.VIEW \
+  -d 'exp+recallbox://?__expo_url=http%3A%2F%2F127.0.0.1%3A8081' app.recallbox.mobile
+# Stop only RecallBox:
+adb -s emulator-5554 shell am force-stop app.recallbox.mobile
+# Stop this emulator:
+adb -s emulator-5554 emu kill
+```
+
+The exact build/run above was verified; do not substitute a bare custom-scheme
+cold launch for the development-client Metro URL. Metro and emulator were stopped
+after screenshots were saved, to free RAM while real identity setup is pending.
 
 ### Resource measurements and S3 decision
 
 Mac M2 ARM64, **8 GiB RAM**. Initial free disk was approximately **18 GiB**;
-final reading approximately **15 GiB**, below the repository's 30 GiB pilot gate.
+final reading approximately **13 GiB**, below the repository's 30 GiB pilot gate.
 Other host activity may contribute to this change. Final memory-pressure report:
-48% system-wide free percentage, about **1.63 GiB swap used**. Idle PostgreSQL
-process RSS totaled approximately **35 MiB** (RSS includes shared pages; it is
-not an exclusive memory accounting). Cluster occupies **63 MiB**, dedicated DB
+65% system-wide free percentage, about **2.42 GiB swap used**. During the emulator
+boot swap peaked around 2.8 GiB; stopping the emulator during downloads improved
+available memory. PostgreSQL's initial idle process RSS totaled approximately
+**35 MiB** (RSS includes shared pages and changes with residency; it is not an
+exclusive memory accounting). Cluster occupies **63 MiB**, dedicated DB
 approximately **8.2 MiB**. No emulator or Gradle build remains running.
 
 Safe remediation candidates for operator review: Homebrew cache approximately
-900 MiB, Gradle directory 6.0 GiB (initial caches alone 5.1 GiB), and unused Android
-SDK components within 7.5 GiB. Review `brew cleanup -n` before any cleanup; remove
+900 MiB, Gradle directory now approximately 4.0 GiB, and unused Android SDK
+components within 7.9 GiB. Generated Android output occupies 1.3 GiB and native
+build output under node_modules increases that directory to 1.8 GiB. Review
+`brew cleanup -n` before any cleanup; remove
 only intentionally selected unused SDKs/images through Android Studio's SDK
 Manager. Cache removal requires redownloads and will not alone necessarily reach
 30 GiB. Move selected personal data to external storage only with explicit owner
-approval. No personal files/caches/SDKs were deleted, and no Xcode, security-setting
+approval. No manual cache cleanup or personal-file/existing-SDK deletion was
+performed, and no Xcode, security-setting
 change, container, model, public API exposure or Cloudflare Tunnel was introduced.
 
 Final state: dedicated loopback PostgreSQL is running; product API and Metro are
 stopped. **S3 should not begin as an accepted operational baseline yet.** Complete
-the real Auth0 setup, approved Android build dependencies, native login and real
+the real Auth0 setup, callback lifecycle verification, native login and real
 two-account note/session/sync acceptance before advancing. The structural DB
 checks above do not replace any of those real-account checks.
 
