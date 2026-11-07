@@ -4,9 +4,9 @@ import asyncpg
 
 
 @asynccontextmanager
-async def owned(pool: asyncpg.Pool, owner: UUID):
+async def owned(pool: asyncpg.Pool, owner: UUID, *, isolation="read_committed", readonly=False):
     # SET LOCAL is reset on commit/rollback and cannot leak through the pool.
-    async with pool.acquire() as conn, conn.transaction():
+    async with pool.acquire() as conn, conn.transaction(isolation=isolation, readonly=readonly):
         await conn.execute("SELECT set_config('app.user_id', $1, true)", str(owner))
         yield conn
 
@@ -23,9 +23,10 @@ async def connect(url: str):
                 raise RuntimeError('Runtime role has migration privileges')
             if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')"):
                 raise RuntimeError('pgvector must be provisioned')
-            if await conn.fetchval('SELECT version_num FROM public.alembic_version') != '0001_s1':
+            if await conn.fetchval('SELECT version_num FROM public.alembic_version') != '0002_memories':
                 raise RuntimeError('Product migration required')
-            for table in ('users', 'identities', 'sessions', 'devices'):
+            for table in ('users', 'identities', 'sessions', 'devices', 'memories',
+                          'memory_revisions', 'idempotency_keys', 'sync_changes'):
                 safe = await conn.fetchval("""SELECT relrowsecurity AND relforcerowsecurity
                     AND pg_get_userbyid(relowner) <> current_user FROM pg_class
                     WHERE oid=to_regclass($1)""", 'public.' + table)
