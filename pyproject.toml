@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+product = ["asyncpg>=0.30,<1", "alembic>=1.14,<2", "psycopg[binary]>=3.2,<4", "PyJWT[crypto]>=2.10,<3"]
 crawl = ["crawl4ai>=0.7,<1.0"]
 documents = ["docling>=2.0,<3.0"]
 readability = ["trafilatura>=2.0,<3.0"]
@@ -23,6 +24,7 @@ dev = ["pytest>=8,<10", "pytest-asyncio>=0.23,<2.0"]
 all = ["crawl4ai>=0.7,<1.0", "docling>=2.0,<3.0", "trafilatura>=2.0,<3.0"]
 
 [project.scripts]
+recallbox-api = "recallbox.cli:main"
 universal-extractor = "universal_extractor.cli:main"
 
 [tool.setuptools.packages.find]

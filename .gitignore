@@ -18,3 +18,12 @@ benchmarks/review_packet*.jsonl
 benchmarks/ai_reviews*.jsonl
 benchmarks/*scores*.csv
 benchmarks/*summary*.csv
+
+# Mobile generated output and product credentials
+node_modules/
+.expo/
+apps/mobile/ios/
+apps/mobile/android/
+.env.*.local
+*.tsbuildinfo
+.env.local

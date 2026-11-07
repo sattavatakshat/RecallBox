@@ -1,0 +1,77 @@
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
+import { Account, api, ApiError, Exchange, Tokens } from './api';
+const KEY = 'recallbox.refresh.v1';
+const options = {keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY};
+type Session = { account: Account | null; loading: boolean; message: string; signIn: (data: Exchange) => Promise<void>; logout: () => Promise<void>; retry: () => Promise<void> };
+const Context = createContext<Session | null>(null);
+export const useSession = () => { const value = useContext(Context); if (!value) throw new Error('Session missing'); return value; };
+export async function deviceId() {
+  let id = await SecureStore.getItemAsync('recallbox.device.v1');
+  if (!id) { id = Crypto.randomUUID(); await SecureStore.setItemAsync('recallbox.device.v1', id, options); }
+  return id;
+}
+export function SessionProvider({children}: React.PropsWithChildren) {
+  const [account, setAccount] = useState<Account | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const current = useRef<{access: string; expires: number} | null>(null);
+  const refreshing = useRef<Promise<string> | null>(null);
+  async function clear() {
+    current.current = null; setAccount(null);
+    await SecureStore.deleteItemAsync(KEY);
+  }
+  async function save(tokens: Tokens) {
+    // Persist the replacement BEFORE exposing its access token to the UI.
+    await SecureStore.setItemAsync(KEY, tokens.refresh_token, options);
+    current.current = {access: tokens.access_token, expires: Date.now() + tokens.expires_in * 1000};
+    return tokens.access_token;
+  }
+  function refresh(): Promise<string> {
+    if (refreshing.current) return refreshing.current;
+    refreshing.current = (async () => {
+      const token = await SecureStore.getItemAsync(KEY);
+      if (!token) throw new ApiError(401, 'authentication_required');
+      // Remove consumed credential before sending. An ambiguous network failure
+      // requires sign-in; replaying a potentially consumed token revokes its family.
+      await SecureStore.deleteItemAsync(KEY);
+      try { return await save(await api.refresh(token)); }
+      catch (error) { await clear(); throw error; }
+    })().finally(() => { refreshing.current = null; });
+    return refreshing.current;
+  }
+  async function access() {
+    if (current.current && current.current.expires > Date.now() + 30000) return current.current.access;
+    return refresh();
+  }
+  async function restore() {
+    setLoading(true);
+    try {
+      if (refreshing.current) await refreshing.current;
+      if (!current.current && !(await SecureStore.getItemAsync(KEY))) { setAccount(null); return; }
+      setAccount(await api.me(await access())); setMessage('');
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await clear(); setMessage('Your session has ended. Sign in again.');
+      } else { setMessage('We could not restore your account. Check your connection and try again.'); }
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { void restore(); const subscription = AppState.addEventListener('change', state => { if (state === 'active') void restore(); }); return () => subscription.remove(); }, []);
+  useEffect(() => {
+    if (!account) return;
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void restore(); }, 9 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [account?.id]);
+  async function signIn(data: Exchange) {
+    const token = await save(await api.exchange(data));
+    try { setAccount(await api.me(token)); setMessage(''); }
+    catch (error) { await clear(); throw error; }
+  }
+  async function logout() {
+    // Keep credential if server revocation fails; allow a deliberate retry.
+    await api.logout(await access()); await clear(); setMessage('Signed out on this device.');
+  }
+  return <Context.Provider value={{account, loading, message, signIn, logout, retry: restore}}>{children}</Context.Provider>;
+}
