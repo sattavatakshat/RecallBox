@@ -1,0 +1,9 @@
+Universal URL Extractor
+Copyright 2026 Akshat Jain
+
+This project is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the license terms.
+
+Third-party libraries and tools used by this project retain their own
+copyright notices and licenses. See pyproject.toml and the linked upstream
+projects in the README for dependency information.
