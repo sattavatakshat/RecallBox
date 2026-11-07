@@ -1,5 +1,67 @@
 # S2 implementation and manual verification
 
+## Auth0 MCP activation follow-up — 7 November 2026
+
+This update supersedes earlier claims below that no real provider/clients are
+configured. Real-account login and authenticated memory acceptance are still
+pending; provider provisioning and backend startup have now passed.
+
+Used the already-installed **Auth0 MCP 0.1.0-beta.19**, authenticated through its
+existing system Keychain session. Its tools were not exposed directly in this
+chat, so connected to the installed stdio server through the official MCP client
+SDK. No management token was printed, copied into the product, or committed.
+Listed existing applications first (only Default App / All Applications existed),
+then invoked **auth0_onboarding** for the generated Android project and completed
+the required **auth0_get_quickstart_guide** step. The returned native Kotlin SDK
+sample was not substituted for the existing Expo PKCE implementation.
+
+Created/configured real clients in `dev-yv4v5wsrtm1158mz.us.auth0.com`:
+
+| Platform | Client ID | Type / token endpoint authentication |
+| --- | --- | --- |
+| Android | `ljbYENikqVCwL0oZG6kfLAGM6qlUdZEd` | Native / none |
+| iOS | `nMgGLNVKLuK0jYUVKU7w1IHft8sjR7tl` | Native / none |
+
+Both clients use only `authorization_code`, OIDC-conformant RS256 ID tokens with
+a 3,600-second lifetime, and exact callback `app.recallbox.mobile://auth/callback`.
+Android package metadata is `app.recallbox.mobile`. The MCP quickstart initially
+registered its Auth0 Android SDK-style callback and automatically enabled
+`skip_non_verifiable_callback_uri_confirmation_prompt`; replaced the callback
+with RecallBox's Expo URI and explicitly set that flag **false** on both clients,
+retaining the custom-scheme confirmation. Provider logout URLs are empty because
+the current app revokes its own RecallBox session, not the provider browser SSO.
+Client secrets in MCP responses are redacted and unused by these public clients.
+
+Ran `scripts/configure_local_auth0.py` with those real IDs. HTTPS discovery passed;
+wrote mode-0600 `~/.config/recallbox/oidc.env` and Git-ignored
+`apps/mobile/.env.local`. Existing database/signing secrets remain outside Git.
+No environment-file contents or secret values were echoed.
+
+Actual live activation evidence:
+
+- Backend completed its PostgreSQL lifespan and listened at `127.0.0.1:8001`.
+- Real HTTP `/v1/health` returned **200** with only `status: ok`; unauthenticated
+  `/v1/me` returned **401 authentication_required**.
+- Product PostgreSQL and API listeners remained loopback-only; the task's Metro
+  instance listens on `127.0.0.1:8081`, reached through ADB reverse.
+- The first native sign-in failed at discovery. Expo 58's discovery helper
+  directly appends `/.well-known/openid-configuration`; Auth0's canonical issuer
+  includes a trailing slash. Real HTTP confirmed the resulting double-slash URL
+  returned **404/non-JSON**, while the single-slash URL returned **200/JSON**.
+- Fixed only mobile discovery URL construction by trimming trailing slashes at
+  that call. The backend keeps the exact canonical issuer for ID-token validation.
+  Temporary stage-only diagnostics were removed. `npm run typecheck` passed.
+- After reload, native sign-in successfully handed off to Chrome's first-run
+  activity. Browser/account entry was handed to the operator. No real accepted
+  login, token refresh/logout, Inbox/note operations, or two-account isolation is
+  claimed from browser handoff alone.
+
+The existing lifecycle commands below now have their real OIDC configuration
+available. At handoff, the backend, local Metro, and visible emulator remain
+running so the operator can finish browser setup/login without losing PKCE state.
+Do not reload or edit the sign-in component during that attempt. Full iOS build,
+cold callback lifecycle, real accounts, and S1/S2 acceptance remain open gates.
+
 7 November 2026, Asia/Kolkata. Baseline: requested main merge `3005dec`.
 **S2 code is implemented; S2.5 PostgreSQL setup passed; real provider/device
 acceptance is BLOCKED.** No real authentication or cross-device success is claimed.

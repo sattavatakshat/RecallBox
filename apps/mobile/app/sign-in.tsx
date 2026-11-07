@@ -17,7 +17,7 @@ export default function SignIn() {
     setBusy(true); setError('');
     try {
       if (!configured || (Platform.OS !== 'ios' && Platform.OS !== 'android')) throw new Error('Native identity configuration is required.');
-      const discovery = await AuthSession.fetchDiscoveryAsync(oidc.issuer);
+      const discovery = await AuthSession.fetchDiscoveryAsync(oidc.issuer.replace(/\/+$/, ''));
       if (!discovery.authorizationEndpoint?.startsWith('https://')) throw new Error('Secure identity service unavailable.');
       const nonce = Crypto.randomUUID() + Crypto.randomUUID();
       const request = new AuthSession.AuthRequest({clientId: oidc.clientId, redirectUri: oidc.redirectUri,
