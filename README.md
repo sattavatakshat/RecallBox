@@ -176,3 +176,9 @@ The separate local-only S1 product API and Expo mobile project are documented in
 acceptance remains blocked on PostgreSQL/pgvector, identity-provider setup and
 both-platform device verification. The extractor and private benchmark laboratory
 retain their existing entry points and SQLite storage.
+
+S2 adds private plain-text notes, versioned edits, durable create retries and a
+cursor-based mobile Inbox/sync client. See the
+[S2 implementation and verification guide](docs/RECALLBOX_S2_IMPLEMENTATION.md)
+and [API contract](docs/RECALLBOX_S2_API.md). Real database/provider/device acceptance
+remains blocked; no public deployment is configured.

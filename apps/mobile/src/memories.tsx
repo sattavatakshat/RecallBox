@@ -126,6 +126,8 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
           } else { if (alive.current) setError(errorMessage(cause)); }
         }
       });
+    } catch (cause) {
+      if (alive.current) setError(errorMessage(cause));
     } finally { polling.current = false; }
   }, [run]);
   const get = useCallback((id: string) => run(() => auth.current(token => memoriesApi.get(token, id))), [run]);
