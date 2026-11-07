@@ -59,6 +59,7 @@ def upgrade():
         """)
     op.execute("""
     GRANT SELECT ON users, identities TO recallbox_api;
+    GRANT UPDATE(sync_sequence) ON users TO recallbox_api;
     GRANT SELECT, INSERT, UPDATE ON devices, sessions TO recallbox_api;
     GRANT SELECT ON alembic_version TO recallbox_api;
     -- Narrow bootstrap functions: fixed search_path, no dynamic SQL, no public EXECUTE.
