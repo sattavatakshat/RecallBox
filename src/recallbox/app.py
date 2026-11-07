@@ -16,6 +16,7 @@ from .db import connect, owned
 from .identity import IdentityRejected, IdentityVerifier
 from .memories import router as memory_router
 from .problems import Problem
+from .sync import router as sync_router
 
 logger = logging.getLogger('recallbox')
 
@@ -177,4 +178,5 @@ def create_app():
         return dict(row)
 
     app.include_router(memory_router)
+    app.include_router(sync_router)
     return app
