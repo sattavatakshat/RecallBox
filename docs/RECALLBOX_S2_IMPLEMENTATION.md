@@ -1,8 +1,218 @@
 # S2 implementation and manual verification
 
 7 November 2026, Asia/Kolkata. Baseline: requested main merge `3005dec`.
-**S2 code is implemented; real PostgreSQL/provider/device acceptance is BLOCKED.**
-No authentication success, database execution or cross-device success is claimed.
+**S2 code is implemented; S2.5 PostgreSQL setup passed; real provider/device
+acceptance is BLOCKED.** No real authentication or cross-device success is claimed.
+
+## S2.5 operational run — 7 November 2026
+
+This section supersedes the host/database status and checkout instructions below,
+which describe the original S2 implementation session. The active checkout is now
+`/Users/akshat/Desktop/RecallBox`, branch `main`, initially clean at `5d5e9ed4`.
+S1/S2 end-to-end acceptance remains blocked by real identity-provider setup and
+native-device verification. No fake account, accepted synthetic identity, public
+listener or tunnel was introduced. No automated test cases were added/modified,
+and no test suite was run.
+
+### Completed host/database operations
+
+The operator explicitly approved native PostgreSQL 17 + pgvector installation.
+Installed PostgreSQL **17.11**, verified Mach-O **arm64**, and pgvector **0.8.7**.
+Homebrew encountered an already-linked certificate dependency (retry proceeded),
+then failed its PostgreSQL post-install/service step with `unknown install step:
+link_dir` / missing `stop_timeout`. The binaries were intact. Completed the
+missing directory links from the installed PostgreSQL keg into
+`/opt/homebrew/share/postgresql@17` and `/opt/homebrew/lib/postgresql@17`, without
+overwriting files. This is a local workaround, not a repaired Homebrew runner;
+review package links after any future PostgreSQL upgrade. No launch agent was
+registered. Homebrew also emitted an unexpanded certificate-link placeholder in
+the checkout; only that newly created broken symlink/empty directory was removed.
+No CA trust/security settings were changed. OpenSSL 4's default certificate link
+still needs Homebrew maintenance before using that CLI for remote TLS; the local
+database does not depend on it. Existing OpenSSL 3 files were retained.
+
+Initialized a separate checksummed cluster at `/opt/homebrew/var/recallbox-pg17`:
+loopback `127.0.0.1:5432`, private mode-0700 socket directory, peer local admin,
+SCRAM TCP authentication, 128 MB shared buffers, 12 connections, 4 MB work memory,
+32 MB maintenance memory, UTC. SQL/parameter statement logging is disabled.
+Created only the dedicated `recallbox` database and existing migrator/API roles,
+ran `scripts/product_roles.sql`, then applied Alembic through `0002_memories`.
+Random database passwords and signing key are outside Git in mode-0600 files
+under mode-0700 `~/.config/recallbox/`: `migration.env` and `runtime.env`.
+Migration credentials are not loaded by the backend command.
+
+Actual manual PostgreSQL evidence:
+
+- Runtime `recallbox.db.connect()` readiness passed; pool limits are 1–3.
+- All eight owned tables belong to the migrator and have ENABLE + FORCE RLS;
+  all 16 policies exist. Both roles are non-superuser/non-BYPASSRLS, with no
+  CREATEDB/CREATEROLE/INHERIT. Runtime has no schema CREATE or migrator membership.
+- Ownerless reads returned zero rows; ownerless insert, CREATE and TRUNCATE were
+  rejected. DELETE/TRUNCATE privileges are absent on all eight owned tables.
+- All constraints are validated and all indexes ready/valid. Catalog inspection
+  confirmed 12 foreign keys, including composite ownership FKs for sessions,
+  revisions, retry responses and sync revision references.
+- Both SECURITY DEFINER functions have fixed search paths and EXECUTE limited
+  to migrator/API, with no PUBLIC grant.
+- Transaction-local owner context cleared after both commit and rollback;
+  all three simultaneously acquired pooled connections had no residual context.
+- Graceful stop, offline `pg_checksums --check`, and restart succeeded:
+  1,292 files / 3,888 blocks scanned, **0 bad checksums**. Migration version
+  `0002_memories` persisted. This is schema persistence evidence, not note evidence.
+- Zero accounts/sessions/memories were seeded. No extractor or benchmark files
+  changed, and no extractor SQLite database was opened or migrated.
+
+### Real authentication remains an external dependency
+
+Selected Auth0's free hosted offering using native public clients and S256 PKCE:
+[flow documentation](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce),
+[application settings](https://auth0.com/docs/get-started/applications/application-settings),
+[current plan](https://auth0.com/pricing). The operator requested preparation for
+a new tenant; no tenant/client/account credentials have been supplied.
+
+Operator action: create a free tenant and two Native applications named
+`RecallBox iOS` / `RecallBox Android`. Both use token endpoint authentication
+`None`, authorization code flow, RS256, and exact allowed callback
+`app.recallbox.mobile://auth/callback`. Enable the same database connection for
+both clients and create two real beta accounts. Leave social providers disabled
+until their separate release requirements are satisfied. Do not copy a client
+secret into the app or backend. A controlled domain is unnecessary for this
+local custom-scheme beta; verified HTTPS app links remain a release gate.
+
+After registration, configure the real public IDs (substitute actual values):
+
+```sh
+cd /Users/akshat/Desktop/RecallBox
+.venv/bin/python scripts/configure_local_auth0.py \
+  --domain YOUR_TENANT.us.auth0.com \
+  --ios-client-id YOUR_REAL_IOS_CLIENT_ID \
+  --android-client-id YOUR_REAL_ANDROID_CLIENT_ID
+```
+
+The helper verifies HTTPS discovery, exact issuer/endpoints, RS256, S256 and
+public-client support, then writes private `~/.config/recallbox/oidc.env` and
+ignored `apps/mobile/.env.local`. It refuses to overwrite existing configuration.
+It does not register clients or claim their dashboard settings are verified.
+Manual helper checks: syntax/help passed; non-Auth0 domain was rejected before
+network or file access. Live discovery/configuration awaits the actual tenant.
+
+The actual backend startup currently fails closed with
+`RECALLBOX_OIDC_PROVIDERS must be configured`; there is no API listener on 8001.
+Real login/refresh/logout/reuse revocation, all authenticated note operations,
+note persistence across backend restart, idempotency/conflicts/cursor sync and
+two-account isolation remain **UNVERIFIED**, pending real provider setup.
+
+### Exact local lifecycle commands
+
+Start/stop the dedicated database (do not use `brew services start`):
+
+```sh
+/opt/homebrew/opt/postgresql@17/bin/pg_ctl -D /opt/homebrew/var/recallbox-pg17 -l /opt/homebrew/var/recallbox-pg17/server.log start
+/opt/homebrew/opt/postgresql@17/bin/pg_ctl -D /opt/homebrew/var/recallbox-pg17 status
+/opt/homebrew/opt/postgresql@17/bin/pg_ctl -D /opt/homebrew/var/recallbox-pg17 stop -m fast
+```
+
+After real OIDC configuration, start the backend in its own terminal:
+
+```sh
+cd /Users/akshat/Desktop/RecallBox
+source "$HOME/.config/recallbox/runtime.env"
+source "$HOME/.config/recallbox/oidc.env"
+unset RECALLBOX_MIGRATION_URL
+.venv/bin/recallbox-api
+# Stop: Ctrl-C in this terminal. Fixed bind: 127.0.0.1:8001.
+```
+
+Start Metro in another terminal after configuring mobile:
+
+```sh
+cd /Users/akshat/Desktop/RecallBox/apps/mobile
+npm start -- --max-workers 2
+# Stop: Ctrl-C in this terminal. Localhost only; no tunnel.
+```
+
+For Android builds, set the existing JDK/SDK explicitly:
+
+```sh
+export JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home'
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
+cd /Users/akshat/Desktop/RecallBox/apps/mobile
+npm run android -- --device
+# After a device is connected, for the loopback API and Metro:
+adb reverse tcp:8001 tcp:8001
+adb reverse tcp:8081 tcp:8081
+```
+
+iOS build command remains `npm run ios`, but full compatible Xcode and signing
+are absent; `xcodebuild -version` and `xcrun simctl` failed under CommandLineTools.
+A physical iPhone also needs a secure local connection path; the API bind must
+remain loopback. Android debug uses the generated debug-only cleartext permission
+for loopback/USB reverse; no release network permission bypass was added.
+
+### Mobile execution and remaining gates
+
+`npm run typecheck` and `CI=1 npx expo prebuild --platform android --no-install`
+passed. Generated native files remain ignored. Expo's incidental tsconfig rewrite
+was restored to its original contents. Metro actually started with
+`CI=1 EXPO_NO_TELEMETRY=1 npx expo start --dev-client --localhost --max-workers 2`;
+`GET http://127.0.0.1:8081/status` returned `packager-status:running`, and `lsof`
+confirmed a **127.0.0.1-only** listener. Metro was stopped after verification;
+no backend or Metro process remains running.
+
+ADB worked outside sandbox restrictions and reported **no connected devices**.
+The existing ARM64 `Medium_Phone_API_36.1` emulator image is available, but no
+emulator was booted and no native UI acceptance is claimed. Android Studio's
+bundled ARM64 JDK **21.0.9** is usable (the shell's default Java discovery instead
+reports Java 8). Installed Android platforms/build tools stop at 36.1; the pinned
+Expo 58 / React Native 0.88.1 native files require compile SDK **37**, build tools
+**37.0.0**, NDK **27.1.12297006** (already present), and Gradle **9.4.1**.
+SDK manager confirms `platforms;android-37.0` and `build-tools;37.0.0` are available.
+Approval for these two SDK packages and online build dependencies was requested
+but has not yet been received; they were not installed.
+
+The actual ARM64 debug build command was:
+
+```sh
+cd /Users/akshat/Desktop/RecallBox/apps/mobile/android
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' \
+ANDROID_HOME=/Users/akshat/Library/Android/sdk \
+./gradlew :app:assembleDebug --offline --no-daemon --max-workers=2 \
+  -PreactNativeArchitectures=arm64-v8a \
+  -Dorg.gradle.jvmargs='-Xmx1536m -XX:MaxMetaspaceSize=512m'
+```
+
+The Gradle 9.4.1 wrapper downloaded successfully. Compilation stopped at native
+plugin resolution because `org.gradle.toolchains.foojay-resolver-convention:1.0.0`
+is not cached. **No APK was produced/installed and no app was launched.** After
+approved SDK/dependency installation, rerun online; do not downgrade the pinned
+application to fit cached tooling. Inbox navigation, real note creation/editing,
+secure restoration, physical-device connectivity and signing remain unverified.
+
+### Resource measurements and S3 decision
+
+Mac M2 ARM64, **8 GiB RAM**. Initial free disk was approximately **18 GiB**;
+final reading approximately **15 GiB**, below the repository's 30 GiB pilot gate.
+Other host activity may contribute to this change. Final memory-pressure report:
+48% system-wide free percentage, about **1.63 GiB swap used**. Idle PostgreSQL
+process RSS totaled approximately **35 MiB** (RSS includes shared pages; it is
+not an exclusive memory accounting). Cluster occupies **63 MiB**, dedicated DB
+approximately **8.2 MiB**. No emulator or Gradle build remains running.
+
+Safe remediation candidates for operator review: Homebrew cache approximately
+900 MiB, Gradle directory 6.0 GiB (initial caches alone 5.1 GiB), and unused Android
+SDK components within 7.5 GiB. Review `brew cleanup -n` before any cleanup; remove
+only intentionally selected unused SDKs/images through Android Studio's SDK
+Manager. Cache removal requires redownloads and will not alone necessarily reach
+30 GiB. Move selected personal data to external storage only with explicit owner
+approval. No personal files/caches/SDKs were deleted, and no Xcode, security-setting
+change, container, model, public API exposure or Cloudflare Tunnel was introduced.
+
+Final state: dedicated loopback PostgreSQL is running; product API and Metro are
+stopped. **S3 should not begin as an accepted operational baseline yet.** Complete
+the real Auth0 setup, approved Android build dependencies, native login and real
+two-account note/session/sync acceptance before advancing. The structural DB
+checks above do not replace any of those real-account checks.
 
 ## Location and commits
 
