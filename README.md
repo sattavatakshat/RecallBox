@@ -1,5 +1,9 @@
 # Universal URL Extractor — local-first MVP
 
+RecallBox's planned product is a complete Android/iOS memory app; this extractor remains one subsystem. The product foundation is documented in the [product PRD](docs/RECALLBOX_PRODUCT_PRD.md), [mobile/backend architecture](docs/RECALLBOX_MOBILE_ARCHITECTURE.md), [Mac host assessment](docs/MAC_M2_HOSTING_PLAN.md), [product database design](docs/RECALLBOX_DATABASE_DESIGN.md), and [implementation/release gates](docs/RECALLBOX_RELEASE_GATES.md). These describe proposed functionality, not a shipped mobile product. The existing benchmark lab stays private and independent.
+
+For a passive, read-only Mac inventory, run `python3 scripts/inspect_mac_host.py`. Keep its output private; upload/download measurement requires the explicit `--active-network` option.
+
 Storage hardening is implemented with additive SQLite migrations through schema 3, per-repetition attempts, immutable hash-checked artifacts, append-only evaluation/score history, and separate feature/label CSV exports. See [working architecture](docs/PROJECT_ARCHITECTURE.md), [data-flow diagrams](docs/ARCHITECTURE_DIAGRAMS.md), [database ER/schema](docs/DATABASE_SCHEMA.md), and the [updated readiness audit](docs/ML_DATA_READINESS_AUDIT_V2.md). Existing v1 records are preserved with unknown legacy provenance where measurements were never captured.
 
 ```bash
