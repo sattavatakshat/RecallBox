@@ -168,3 +168,11 @@ Bug reports, documentation improvements, supported-adapter ideas, security harde
 Copyright 2026 Akshat Jain. Project-owned content is available under the [Apache License 2.0](LICENSE). Third-party tools and libraries remain subject to their own licenses. See [NOTICE](NOTICE).
 
 The repository is newly public; no community adoption, benchmark results, or production security guarantees are implied.
+
+## RecallBox product implementation
+
+The separate local-only S1 product API and Expo mobile project are documented in
+[the S1 implementation guide](docs/RECALLBOX_S1_IMPLEMENTATION.md). Live S1
+acceptance remains blocked on PostgreSQL/pgvector, identity-provider setup and
+both-platform device verification. The extractor and private benchmark laboratory
+retain their existing entry points and SQLite storage.

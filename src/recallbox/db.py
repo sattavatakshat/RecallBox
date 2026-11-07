@@ -16,9 +16,13 @@ async def connect(url: str):
                                    server_settings={'timezone': 'UTC', 'application_name': 'recallbox'})
     try:
         async with pool.acquire() as conn:
-            role = await conn.fetchrow('SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user')
-            if role['rolsuper'] or role['rolbypassrls']:
+            role = await conn.fetchrow('SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname=current_user')
+            if any(role.values()):
                 raise RuntimeError('Unsafe runtime database role')
+            if await conn.fetchval("SELECT has_schema_privilege(current_user,'public','CREATE') OR pg_has_role(current_user,'recallbox_migrator','MEMBER')"):
+                raise RuntimeError('Runtime role has migration privileges')
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')"):
+                raise RuntimeError('pgvector must be provisioned')
             if await conn.fetchval('SELECT version_num FROM public.alembic_version') != '0001_s1':
                 raise RuntimeError('Product migration required')
             for table in ('users', 'identities', 'sessions', 'devices'):

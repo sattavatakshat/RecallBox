@@ -5,7 +5,6 @@ import time
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 from uuid import UUID, uuid4
-import asyncpg
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -90,7 +89,9 @@ def create_app():
 
     def error(request, status, code, headers=None):
         return JSONResponse({'error': {'code': code, 'request_id': request.state.request_id}},
-                            status_code=status, headers=headers)
+                            status_code=status, headers={'Cache-Control': 'no-store',
+                            'X-Content-Type-Options': 'nosniff', 'X-Request-ID': request.state.request_id,
+                            **(headers or {})})
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request, exc):
@@ -124,6 +125,7 @@ def create_app():
                 VALUES($1,$2,$3,$4) ON CONFLICT(owner_id,client_device_id)
                 DO UPDATE SET last_seen_at=now(),revoked_at=NULL RETURNING id''',
                 uuid4(), owner, body.client_device_id, body.platform)
+            await conn.execute('UPDATE sessions SET revoked_at=coalesce(revoked_at,now()) WHERE device_id=$1', device)
             result, _ = await issue(conn, settings, owner, device=device)
         return result
 

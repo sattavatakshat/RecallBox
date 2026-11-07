@@ -47,12 +47,16 @@ class Settings:
         providers = {}
         for name, item in json.loads(required('OIDC_PROVIDERS')).items():
             provider = Provider(**item)
+            if any('REPLACE_' in value for value in vars(provider).values()):
+                raise ValueError('Replace every provider configuration placeholder')
             for endpoint in (provider.issuer, provider.token_endpoint, provider.jwks_uri):
                 https(endpoint)
             redirect = urlsplit(provider.redirect_uri)
             if not provider.client_id or not redirect.scheme or redirect.scheme in ('http', 'exp'):
                 raise ValueError('Native registered redirect and public client ID required')
             providers[name] = provider
+        if len(providers) > 16:
+            raise ValueError('At most 16 configured native clients allowed')
         if not providers:
             raise ValueError('At least one real OIDC provider is required')
         return cls(database_url, key, providers)

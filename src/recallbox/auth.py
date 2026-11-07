@@ -22,11 +22,12 @@ async def issue(conn, settings, owner, family=None, device=None, expiry=None):
     expiry = expiry or now + timedelta(days=30)
     await conn.execute('''INSERT INTO sessions(id,owner_id,family_id,device_id,refresh_hash,expires_at)
         VALUES($1,$2,$3,$4,$5,$6)''', session, owner, family or uuid4(), device, digest(refresh), expiry)
+    lifetime = max(0, min(600, int((expiry - now).total_seconds())))
     access = jwt.encode({'iss': settings.issuer, 'aud': 'recallbox-mobile', 'sub': str(owner),
-        'sid': str(session), 'iat': now, 'exp': now + timedelta(minutes=10), 'jti': str(uuid4())},
+        'sid': str(session), 'iat': now, 'exp': now + timedelta(seconds=lifetime), 'jti': str(uuid4())},
         settings.signing_key, algorithm='HS256')
     return {'access_token': access, 'refresh_token': refresh, 'token_type': 'Bearer',
-            'expires_in': 600}, session
+            'expires_in': lifetime}, session
 
 
 async def principal(request: Request):
