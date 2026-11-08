@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { memoriesApi, MemorySummary } from '../../src/api';
 import { useSession } from '../../src/session';
 import { Button, Input, Notice, Screen, TextAction, Type } from '../../src/ui';
 
 export default function Search() {
   const {authorized} = useSession();
+  const auth = useRef(authorized); auth.current = authorized;
   const [q, setQ] = useState('');
   const [items, setItems] = useState<MemorySummary[]>([]);
   const [status, setStatus] = useState('Search your saved titles and content.');
@@ -17,7 +18,11 @@ export default function Search() {
   const [collections,setCollections] = useState<{collection:string;count:number}[]>([]);
   const sequence = useRef(0);
   useEffect(() => () => { sequence.current += 1; }, []);
-  useEffect(() => {void authorized(memoriesApi.collections).then(result => setCollections(result.items)).catch(() => undefined);}, []);
+  useFocusEffect(useCallback(() => {
+    let active=true;
+    void auth.current(memoriesApi.collections).then(result => {if(active) setCollections(result.items);}).catch(() => undefined);
+    return () => {active=false;};
+  }, []));
   async function search() {
     const current = ++sequence.current;
     setBusy(true); setItems([]); setStatus('Searching your library…');
