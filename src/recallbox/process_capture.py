@@ -59,6 +59,11 @@ def extract(kind, source, directory):
         if result.content_type.split(';')[0] not in ('text/html','application/xhtml+xml','text/plain'):
             return {'state':'metadata_only','text':'','error':'This URL does not provide supported article text. Original URL retained.'}
         parsed = parse_html(result,Settings(max_content_chars=100000))
+        host = (urlsplit(result.url).hostname or '').lower()
+        social = ('instagram.com','tiktok.com','youtube.com','youtu.be','x.com','twitter.com','facebook.com','fb.watch','threads.net')
+        if any(host==domain or host.endswith('.'+domain) for domain in social):
+            return {'state':'metadata_only','text':parsed.description or '', 'title':(parsed.title or '')[:240],
+                    'error':'Social page preview only. No transcript or unavailable media was captured.'}
         return {'state':'ready' if parsed.content else 'metadata_only', 'text':parsed.content or parsed.description or '',
                 'title':(parsed.title or '')[:240], 'error':None if parsed.content else 'Only available page metadata was captured.'}
     if kind == 'pdf':
@@ -94,7 +99,7 @@ def main():
         result = extract(sys.argv[1],sys.argv[2],Path(sys.argv[3]))
     except Exception:
         result = {'state':'failed','text':'','error':'Processing failed. Source may be unavailable, unsafe, invalid or too large.'}
-    print(json.dumps(result))
+    print(json.dumps(result,ensure_ascii=False))
 
 
 if __name__ == '__main__':

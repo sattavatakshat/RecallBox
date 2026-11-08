@@ -64,7 +64,8 @@ async def process(row, asset):
 
 async def tick(pool, owner):
     async with owned(pool,owner) as conn:
-        await conn.fetchval('SELECT id FROM users WHERE id=$1 FOR UPDATE',owner)
+        if not await conn.fetchval("SELECT id FROM users WHERE id=$1 AND status='active' FOR UPDATE",owner):
+            return False
         # A crashed last attempt must become visibly retryable after its lease.
         expired = await conn.fetch('''UPDATE ingestion_jobs SET state='failed',error='Processing interrupted. Please retry.'
           WHERE state='processing' AND lease_until<now() AND attempts>=3 RETURNING memory_id''')
@@ -80,10 +81,13 @@ async def tick(pool, owner):
         attempt = job['attempts']+1
         lease_id = uuid4()
         await conn.execute("UPDATE ingestion_jobs SET state='processing',attempts=$2,lease_until=now()+interval '90 seconds',lease_id=$3,updated_at=now() WHERE memory_id=$1",job['memory_id'],attempt,lease_id)
-        row = await conn.fetchrow("UPDATE memories SET processing_state='processing',processing_error=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *",job['memory_id'])
-        await publish(conn,owner,row,'upsert')
-        asset = await conn.fetchval('SELECT data FROM capture_assets WHERE memory_id=$1',row['id'])
-    result = await process(row,asset)
+        row = await conn.fetchrow('SELECT * FROM memories WHERE id=$1 FOR UPDATE',job['memory_id'])
+        index_only = row['kind']=='note' or row['processing_state'] in ('ready','metadata_only')
+        if not index_only:
+            row = await conn.fetchrow("UPDATE memories SET processing_state='processing',processing_error=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *",job['memory_id'])
+            await publish(conn,owner,row,'upsert')
+        asset = await conn.fetchval('SELECT data FROM capture_assets WHERE memory_id=$1',row['id']) if not index_only else None
+    result = {'state':row['processing_state'],'text':row['extracted_text'],'error':row['processing_error']} if index_only else await process(row,asset)
     vector = await embed(row['title']+'\n'+row['user_note']+'\n'+result.get('text','')) if result['state']!='failed' else None
     async with owned(pool,owner) as conn:
         await conn.fetchval('SELECT id FROM users WHERE id=$1 FOR UPDATE',owner)
@@ -95,6 +99,10 @@ async def tick(pool, owner):
         state = 'queued' if again else result['state']
         await conn.execute('''UPDATE ingestion_jobs SET state=$2,error=$3,lease_until=NULL,available_at=now()+interval '15 seconds',updated_at=now()
           WHERE memory_id=$1''',row['id'],'queued' if again else ('failed' if state=='failed' else 'done'),result.get('error'))
+        if index_only:
+            await conn.execute('UPDATE memories SET embedding=$2::vector,embedding_version=$3 WHERE id=$1',row['id'],vector,1 if vector else None)
+            print(json.dumps({'event':'memory_indexed','state':state}),flush=True)
+            return True
         title = result.get('title') if current['title']==row['title'] and row['kind']=='url' and row['title']==urlsplit(row['source_url']).hostname else None
         updated = await conn.fetchrow('''UPDATE memories SET processing_state=$2,processing_error=$3,extracted_text=$4,
           title=$5,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *''',row['id'],state,result.get('error'),result.get('text','')[:100000],title or current['title'])
