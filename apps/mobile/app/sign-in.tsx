@@ -5,7 +5,8 @@ import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { configured, oidc } from '../src/config';
-import { deviceId, useSession } from '../src/session';
+import { useSession } from '../src/session';
+import { completeAuth, rememberAuth } from '../src/pending-auth';
 import { Button, Notice, Screen, Type } from '../src/ui';
 WebBrowser.maybeCompleteAuthSession();
 export default function SignIn() {
@@ -24,11 +25,12 @@ export default function SignIn() {
         scopes: ['openid'], responseType: AuthSession.ResponseType.Code, usePKCE: true,
         codeChallengeMethod: AuthSession.CodeChallengeMethod.S256, extraParams: {nonce}});
       await request.makeAuthUrlAsync(discovery);
+      if (!request.codeVerifier) throw new Error('Secure sign-in unavailable.');
+      await rememberAuth(request.state, request.codeVerifier, nonce);
       const result = await request.promptAsync(discovery);
       if (result.type === 'cancel' || result.type === 'dismiss') return;
       if (result.type !== 'success' || result.params.state !== request.state || !result.params.code || !request.codeVerifier) throw new Error('Sign-in was not completed.');
-      await signIn({provider: oidc.provider, code: result.params.code, code_verifier: request.codeVerifier,
-        nonce, client_device_id: await deviceId(), platform: Platform.OS as 'ios' | 'android'});
+      await completeAuth(result.params, signIn);
       router.replace('/(account)');
     } catch { setError('Sign-in could not be completed. Check your connection and try again.'); }
     finally { setBusy(false); }
