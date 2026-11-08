@@ -143,6 +143,19 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
                 'sync_cursor': encode(request.app.state.settings, owner, user['sync_epoch'], 'sync', after=high)}
 
 
+@router.get('/search')
+async def search_memories(request: Request, q: str = Query(min_length=1, max_length=200),
+                          who=Depends(principal)):
+    async with owned(request.app.state.pool, who[0], readonly=True) as conn:
+        rows = await conn.fetch('''SELECT *, ts_rank_cd(
+            to_tsvector('english',title || ' ' || user_note), plainto_tsquery('english',$1)) AS rank
+            FROM memories WHERE deleted_at IS NULL AND (
+              to_tsvector('english',title || ' ' || user_note) @@ plainto_tsquery('english',$1)
+              OR strpos(lower(title || ' ' || user_note),lower($1))>0)
+            ORDER BY rank DESC,updated_at DESC,id DESC LIMIT 50''', q.strip())
+    return {'items': [memory(row, detail=False) for row in rows]}
+
+
 @router.get('/memories/{memory_id}')
 async def get_note(memory_id: UUID, request: Request, who=Depends(principal)):
     async with owned(request.app.state.pool, who[0]) as conn:

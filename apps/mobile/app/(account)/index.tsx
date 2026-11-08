@@ -30,6 +30,7 @@ export default function Inbox() {
         <Type title>{store.archived ? 'Tucked away.' : 'Your little library.'}</Type>
         <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A thought, a detail, a little thing worth keeping.'}</Type>
         <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
+        <Button label="Search your memories" onPress={() => router.push('/(account)/search')}/>
         <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
           onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
