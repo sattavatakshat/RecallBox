@@ -18,16 +18,26 @@ export default function SignIn() {
     setBusy(true); setError('');
     try {
       if (!configured || (Platform.OS !== 'ios' && Platform.OS !== 'android')) throw new Error('Native identity configuration is required.');
-      const discovery = await AuthSession.fetchDiscoveryAsync(oidc.issuer.replace(/\/+$/, ''));
+      let discoveryTimer: ReturnType<typeof setTimeout> | undefined;
+      const discovery = await Promise.race([
+        AuthSession.fetchDiscoveryAsync(oidc.issuer.replace(/\/+$/, '')),
+        new Promise<never>((_,reject) => {discoveryTimer=setTimeout(() => reject(new Error('Identity service timed out')),15000);}),
+      ]).finally(() => {if(discoveryTimer) clearTimeout(discoveryTimer);});
       if (!discovery.authorizationEndpoint?.startsWith('https://')) throw new Error('Secure identity service unavailable.');
       const nonce = Crypto.randomUUID() + Crypto.randomUUID();
       const request = new AuthSession.AuthRequest({clientId: oidc.clientId, redirectUri: oidc.redirectUri,
         scopes: ['openid'], responseType: AuthSession.ResponseType.Code, usePKCE: true,
         prompt: AuthSession.Prompt.Login,
         codeChallengeMethod: AuthSession.CodeChallengeMethod.S256, extraParams: {nonce}});
-      await request.makeAuthUrlAsync(discovery);
+      const authUrl = await request.makeAuthUrlAsync(discovery);
       if (!request.codeVerifier) throw new Error('Secure sign-in unavailable.');
       await rememberAuth(request.state, request.codeVerifier, nonce);
+      if (Platform.OS==='android') {
+        // The session provider validates warm links and encrypted cold callbacks.
+        // Avoid Expo's Android AppState-based browser-close lock after cancellation.
+        await WebBrowser.openBrowserAsync(authUrl);
+        return;
+      }
       const result = await request.promptAsync(discovery);
       if (result.type === 'cancel' || result.type === 'dismiss') return;
       if (result.type !== 'success' || result.params.state !== request.state || !result.params.code || !request.codeVerifier) throw new Error('Sign-in was not completed.');
