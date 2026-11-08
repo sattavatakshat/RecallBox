@@ -17,6 +17,7 @@ from .identity import IdentityRejected, IdentityVerifier
 from .memories import router as memory_router
 from .problems import Problem
 from .sync import router as sync_router
+from .capture import router as capture_router
 
 logger = logging.getLogger('recallbox')
 
@@ -75,7 +76,8 @@ def create_app():
             data = bytearray()
             async for chunk in request.stream():
                 data.extend(chunk)
-                if len(data) > (16384 if request.url.path.startswith('/v1/auth/') else 262144):
+                limit = 8 * 1024 * 1024 if request.url.path == '/v1/uploads' else (16384 if request.url.path.startswith('/v1/auth/') else 262144)
+                if len(data) > limit:
                     return error(request, 413, 'request_too_large')
             request._body = bytes(data)
         try:
@@ -179,4 +181,5 @@ def create_app():
 
     app.include_router(memory_router)
     app.include_router(sync_router)
+    app.include_router(capture_router)
     return app

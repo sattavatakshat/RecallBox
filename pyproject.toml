@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 product = ["asyncpg>=0.30,<1", "alembic>=1.14,<2", "psycopg[binary]>=3.2,<4", "PyJWT[crypto]>=2.10,<3"]
+capture = ["pypdf>=6.6,<7", "Pillow>=12.1,<13"]
 crawl = ["crawl4ai>=0.7,<1.0"]
 documents = ["docling>=2.0,<3.0"]
 readability = ["trafilatura>=2.0,<3.0"]

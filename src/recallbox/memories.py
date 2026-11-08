@@ -35,6 +35,7 @@ class EditNote(BaseModel):
     content: str | None = Field(default=None, min_length=1, max_length=100000)
     starred: bool | None = None
     archived: bool | None = None
+    collection: str | None = Field(default=None, max_length=80)
 
     @model_validator(mode='after')
     def fields_valid(self):
@@ -49,11 +50,15 @@ class EditNote(BaseModel):
 def memory(row, *, detail=True):
     result = {k: row[k] for k in ('id', 'kind', 'title', 'version', 'starred', 'archived', 'created_at', 'updated_at')}
     result['content' if detail else 'preview'] = row['user_note'] if detail else row['user_note'][:200]
+    for key in ('source_url', 'processing_state', 'processing_error', 'labels', 'collection'):
+        result[key] = row[key]
+    if detail:
+        result['extracted_text'] = row['extracted_text']
     return jsonable_encoder(result)
 
 
 def summary_columns():
-    return 'id,kind,title,version,starred,archived,created_at,updated_at,left(user_note,200) AS user_note'
+    return 'id,kind,title,version,starred,archived,created_at,updated_at,source_url,processing_state,processing_error,labels,collection,left(user_note,200) AS user_note'
 
 
 @asynccontextmanager
@@ -146,12 +151,14 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
 @router.get('/search')
 async def search_memories(request: Request, q: str = Query(min_length=1, max_length=200),
                           who=Depends(principal)):
+    if not q.strip():
+        raise Problem(422, 'empty_query')
     async with owned(request.app.state.pool, who[0], readonly=True) as conn:
         rows = await conn.fetch('''SELECT *, ts_rank_cd(
-            to_tsvector('english',title || ' ' || user_note), plainto_tsquery('english',$1)) AS rank
+            to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text), plainto_tsquery('english',$1)) AS rank
             FROM memories WHERE deleted_at IS NULL AND (
-              to_tsvector('english',title || ' ' || user_note) @@ plainto_tsquery('english',$1)
-              OR strpos(lower(title || ' ' || user_note),lower($1))>0)
+              to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text) @@ plainto_tsquery('english',$1)
+              OR strpos(lower(title || ' ' || user_note || ' ' || extracted_text || ' ' || collection || ' ' || array_to_string(labels,' ')),lower($1))>0)
             ORDER BY rank DESC,updated_at DESC,id DESC LIMIT 50''', q.strip())
     return {'items': [memory(row, detail=False) for row in rows]}
 
@@ -176,11 +183,11 @@ async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depen
         values = dict(row)
         for field in body.model_fields_set - {'expected_version'}:
             values['user_note' if field == 'content' else field] = getattr(body, field)
-        if all(values[k] == row[k] for k in ('title', 'user_note', 'starred', 'archived')):
+        if all(values[k] == row[k] for k in ('title', 'user_note', 'starred', 'archived', 'collection')):
             return memory(row)
         updated = await conn.fetchrow('''UPDATE memories SET title=$1,user_note=$2,starred=$3,archived=$4,
-            version=version+1,updated_at=clock_timestamp() WHERE id=$5 RETURNING *''',
-            values['title'], values['user_note'], values['starred'], values['archived'], memory_id)
+            collection=$5,version=version+1,updated_at=clock_timestamp() WHERE id=$6 RETURNING *''',
+            values['title'], values['user_note'], values['starred'], values['archived'], values['collection'], memory_id)
         await publish(conn, who[0], updated, 'upsert')
         return memory(updated)
 
@@ -198,4 +205,5 @@ async def delete_note(memory_id: UUID, request: Request,
             raise Problem(409, 'version_conflict', current=memory(row))
         updated = await conn.fetchrow('''UPDATE memories SET deleted_at=clock_timestamp(),updated_at=clock_timestamp(),
             version=version+1 WHERE id=$1 RETURNING *''', memory_id)
+        await conn.execute("UPDATE ingestion_jobs SET state='done',lease_until=NULL WHERE memory_id=$1",memory_id)
         await publish(conn, who[0], updated, 'delete')
