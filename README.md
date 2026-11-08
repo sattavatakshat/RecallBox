@@ -6,7 +6,7 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
 
-> **Project status:** Working experimental extractor and benchmark lab (v0.3). This is not a production-ready public scraping service. The planned RecallBox personal-memory app is **not implemented in this repository**.
+> **Project status:** Working experimental extractor/benchmark lab and a local RecallBox Android prototype. The prototype has real Auth0 authentication, PostgreSQL persistence, capture and local search. See [startup commands and limits](docs/RECALLBOX_PROTOTYPE.md). Public deployment remains gated.
 
 ## Why this exists
 
@@ -24,12 +24,12 @@ Universal URL Extractor aims to make this work **modular, measurable, and transp
 | | Universal URL Extractor | RecallBox |
 |---|---|---|
 | **What it is** | Reusable developer infrastructure | Planned personal digital-memory application |
-| **Status** | Working experimental implementation in this repo | Product vision / future implementation |
+| **Status** | Working experimental implementation in this repo | Local Android prototype in this repo |
 | **Focus** | URL extraction, normalized output, engine benchmarking | Save, rediscover, and eventually act on personal saved content |
 | **Typical user** | Developers, researchers, knowledge-system builders | People saving links, articles, screenshots, and notes |
 | **Boundary** | Does **not** provide semantic search, user accounts, or a consumer UI | Would consume the extractor as one ingestion component |
 
-**RecallBox is a proposed downstream use case**, not a claim about features shipped here. Read [the RecallBox vision](docs/RECALLBOX_VISION.md).
+RecallBox consumes the extractor as a separate local product. The complete release target remains [the RecallBox PRD](docs/RECALLBOX_PRODUCT_PRD.md).
 
 ## What works in v0.3
 
@@ -46,7 +46,7 @@ Universal URL Extractor aims to make this work **modular, measurable, and transp
 - Manual/blinded evaluation workflow and optional, explicitly enabled OpenAI API scoring.
 - Evidence-gated scores, category leaderboards, data exports, and comparison tools.
 
-**Not shipped:** guaranteed social/video understanding, audio transcription, image OCR, RecallBox UI, embeddings/semantic search, a trained ML router, a verified 1,000-URL benchmark corpus, or production-grade multi-tenant hosting.
+**Not shipped:** guaranteed social/video understanding, audio transcription, image OCR, a trained ML router, a verified 1,000-URL benchmark corpus, or production-grade multi-tenant hosting. RecallBox's separate prototype provides its own UI and local embeddings/search.
 
 ## Quick start
 
@@ -132,7 +132,7 @@ Universal URL Extractor
             |-- human-verified references / optional AI review
             +-- evidence-gated scores and reports
 
-Future, separate application:
+Separate local application:
 RecallBox ingestion -> personal library -> semantic retrieval -> user actions
           ^
           | may use Universal URL Extractor
@@ -171,14 +171,16 @@ The repository is newly public; no community adoption, benchmark results, or pro
 
 ## RecallBox product implementation
 
-The separate local-only S1 product API and Expo mobile project are documented in
-[the S1 implementation guide](docs/RECALLBOX_S1_IMPLEMENTATION.md). Live S1
-acceptance remains blocked on PostgreSQL/pgvector, identity-provider setup and
-both-platform device verification. The extractor and private benchmark laboratory
-retain their existing entry points and SQLite storage.
+For the current Android prototype, start with [the local run guide](docs/RECALLBOX_PROTOTYPE.md). The S1/S2 guides below retain historical implementation and acceptance records.
+
+The S1 product API and Expo foundations are documented in
+[the S1 implementation guide](docs/RECALLBOX_S1_IMPLEMENTATION.md). Current real
+PostgreSQL/Auth0/Android acceptance is recorded in the prototype run guide above.
+The extractor and private benchmark laboratory retain their existing entry points
+and SQLite storage. iOS native acceptance remains open.
 
 S2 adds private plain-text notes, versioned edits, durable create retries and a
 cursor-based mobile Inbox/sync client. See the
 [S2 implementation and verification guide](docs/RECALLBOX_S2_IMPLEMENTATION.md)
-and [API contract](docs/RECALLBOX_S2_API.md). Real database/provider/device acceptance
-remains blocked; no public deployment is configured.
+and [API contract](docs/RECALLBOX_S2_API.md). The current prototype adds capture,
+durable ingestion and local search. No public deployment is configured.
