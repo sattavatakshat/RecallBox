@@ -33,6 +33,9 @@ export default function Capture() {
     finally {lock.current=false; setBusy(false);}
   }
   async function choose(camera: boolean) {
+    // The Android 16 Photo Picker performs a synchronous MIME query on the
+    // activity thread in this Expo version. DocumentsUI avoids that ANR path.
+    if (!camera) {await document(true);return;}
     try {
       if(camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) {setMessage('Camera access is needed to take a photo. You can choose an existing image instead.'); return;}
       const result = camera ? await ImagePicker.launchCameraAsync({quality:0.8,mediaTypes:['images']})
@@ -42,9 +45,9 @@ export default function Capture() {
       await save({key:Crypto.randomUUID(),uri:asset.uri,mime:asset.mimeType || 'image/jpeg',name:asset.fileName || 'Captured photo.jpg'});
     } catch {setMessage('The image could not be opened. Try another file.');}
   }
-  async function document() {
+  async function document(imagesOnly=false) {
     try {
-      const result=await DocumentPicker.getDocumentAsync({type:['application/pdf','image/png','image/jpeg','image/webp'],copyToCacheDirectory:true,multiple:false});
+      const result=await DocumentPicker.getDocumentAsync({type:imagesOnly?['image/png','image/jpeg','image/webp']:['application/pdf','image/png','image/jpeg','image/webp'],copyToCacheDirectory:true,multiple:false});
       if(result.canceled) return;
       const asset=result.assets[0]; if(!asset) return;
       await save({key:Crypto.randomUUID(),uri:asset.uri,mime:asset.mimeType || 'application/octet-stream',name:asset.name});
