@@ -9,7 +9,8 @@ export function usePalette() {
 }
 export function Type({children, title = false, muted = false}: React.PropsWithChildren<{title?: boolean; muted?: boolean}>) {
   const p = usePalette();
-  return <Text style={{color: muted ? p.muted : p.ink, fontFamily: title ? Platform.select({ios: 'Georgia', android: 'serif'}) : undefined, fontSize: title ? 42 : 17, lineHeight: title ? 49 : 26, fontWeight: title ? '400' : '400'}}>{children}</Text>;
+  const longTitle=title && typeof children==='string' && children.length>30;
+  return <Text style={{color: muted ? p.muted : p.ink, fontFamily: title ? Platform.select({ios: 'Georgia', android: 'serif'}) : undefined, fontSize: title ? (longTitle?32:42) : 17, lineHeight: title ? (longTitle?39:49) : 26, fontWeight: '400'}}>{children}</Text>;
 }
 export function Screen({children}: React.PropsWithChildren) {
   const p = usePalette();

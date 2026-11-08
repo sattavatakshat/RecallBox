@@ -42,7 +42,8 @@ export default function Capture() {
         : await ImagePicker.launchImageLibraryAsync({quality:0.8,mediaTypes:['images']});
       if(result.canceled) return;
       const asset=result.assets[0]; if(!asset) return;
-      await save({key:Crypto.randomUUID(),uri:asset.uri,mime:asset.mimeType || 'image/jpeg',name:asset.fileName || 'Captured photo.jpg'});
+      await save({key:Crypto.randomUUID(),uri:asset.uri,mime:asset.mimeType || 'image/jpeg',
+        name:camera ? `Photo ${new Date().toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}.jpg` : asset.fileName || 'Saved image.jpg'});
     } catch {setMessage('The image could not be opened. Try another file.');}
   }
   async function document(imagesOnly=false) {
