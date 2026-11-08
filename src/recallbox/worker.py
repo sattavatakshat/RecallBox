@@ -7,13 +7,17 @@ import signal
 from pathlib import Path
 import sys
 import tempfile
-from uuid import UUID
+from uuid import UUID, uuid4
+from urllib.parse import urlsplit
 from .config import Settings
 from .db import connect, owned
 from .memories import publish
+from .embeddings import embed
 
 
 async def process(row, asset):
+    if row['kind']=='note':
+        return {'state':'ready','text':'','error':None}
     with tempfile.TemporaryDirectory(prefix='recallbox-job-') as temp:
         directory = Path(temp).resolve()
         if asset:
@@ -74,25 +78,28 @@ async def tick(pool, owner):
         if job is None:
             return False
         attempt = job['attempts']+1
-        await conn.execute("UPDATE ingestion_jobs SET state='processing',attempts=$2,lease_until=now()+interval '90 seconds',updated_at=now() WHERE memory_id=$1",job['memory_id'],attempt)
+        lease_id = uuid4()
+        await conn.execute("UPDATE ingestion_jobs SET state='processing',attempts=$2,lease_until=now()+interval '90 seconds',lease_id=$3,updated_at=now() WHERE memory_id=$1",job['memory_id'],attempt,lease_id)
         row = await conn.fetchrow("UPDATE memories SET processing_state='processing',processing_error=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *",job['memory_id'])
         await publish(conn,owner,row,'upsert')
         asset = await conn.fetchval('SELECT data FROM capture_assets WHERE memory_id=$1',row['id'])
     result = await process(row,asset)
+    vector = await embed(row['title']+'\n'+row['user_note']+'\n'+result.get('text','')) if result['state']!='failed' else None
     async with owned(pool,owner) as conn:
         await conn.fetchval('SELECT id FROM users WHERE id=$1 FOR UPDATE',owner)
         current = await conn.fetchrow('SELECT * FROM memories WHERE id=$1 FOR UPDATE',row['id'])
         lease = await conn.fetchrow('SELECT * FROM ingestion_jobs WHERE memory_id=$1 FOR UPDATE',row['id'])
-        if not current or current['deleted_at'] or lease['state']!='processing' or lease['attempts']!=attempt:
+        if not current or current['deleted_at'] or lease['state']!='processing' or lease['lease_id']!=lease_id:
             return True
         again = result['state']=='failed' and attempt<3
         state = 'queued' if again else result['state']
         await conn.execute('''UPDATE ingestion_jobs SET state=$2,error=$3,lease_until=NULL,available_at=now()+interval '15 seconds',updated_at=now()
           WHERE memory_id=$1''',row['id'],'queued' if again else ('failed' if state=='failed' else 'done'),result.get('error'))
-        title = result.get('title') if current['title']==row['title'] else None
+        title = result.get('title') if current['title']==row['title'] and row['kind']=='url' and row['title']==urlsplit(row['source_url']).hostname else None
         updated = await conn.fetchrow('''UPDATE memories SET processing_state=$2,processing_error=$3,extracted_text=$4,
           title=$5,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *''',row['id'],state,result.get('error'),result.get('text','')[:100000],title or current['title'])
         await publish(conn,owner,updated,'upsert')
+        await conn.execute('UPDATE memories SET embedding=$2::vector,embedding_version=$3 WHERE id=$1',row['id'],vector,1 if vector else None)
     print(json.dumps({'event':'capture_processed','state':state,'attempt':attempt}),flush=True)
     return True
 
@@ -116,7 +123,10 @@ def main():
     parser.add_argument('--owner',action='append',type=UUID,required=True,help='Explicit local beta account UUID; repeat for multiple accounts')
     parser.add_argument('--once',action='store_true')
     args = parser.parse_args()
-    asyncio.run(run(args.owner,args.once))
+    try:
+        asyncio.run(run(args.owner,args.once))
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__=='__main__':

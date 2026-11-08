@@ -11,6 +11,7 @@ from .auth import denied, principal
 from .cursors import decode, encode
 from .db import owned
 from .problems import Problem
+from .embeddings import embed
 
 router = APIRouter(prefix='/v1')
 
@@ -108,6 +109,7 @@ async def create_note(body: CreateNote, request: Request,
         row = await conn.fetchrow('''INSERT INTO memories(id,owner_id,title,user_note,created_sequence)
             VALUES($1,$2,$3,$4,$5) RETURNING *''', uuid4(), owner, body.title, body.content, next_seq)
         await publish(conn, owner, row, 'upsert')
+        await conn.execute('INSERT INTO ingestion_jobs(owner_id,memory_id) VALUES($1,$2)',owner,row['id'])
         await conn.execute('''INSERT INTO idempotency_keys(owner_id,key,route,request_hash,response_status,response_entity_id,expires_at)
             VALUES($1,$2,'/v1/memories',$3,201,$4,clock_timestamp()+interval '24 hours')''',
             owner, idempotency_key, request_hash, row['id'])
@@ -149,18 +151,37 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
 
 
 @router.get('/search')
-async def search_memories(request: Request, q: str = Query(min_length=1, max_length=200),
+async def search_memories(request: Request, q: str = Query(default='', max_length=200),
+                          mode: str = Query(default='keyword',pattern='^(keyword|semantic)$'),
+                          collection: str | None = Query(default=None,max_length=80), starred: bool = False,
                           who=Depends(principal)):
-    if not q.strip():
+    if not q.strip() and collection is None and not starred:
         raise Problem(422, 'empty_query')
+    vector = await embed(q) if mode=='semantic' and q.strip() else None
+    if mode=='semantic' and q.strip() and vector is None:
+        raise Problem(503,'local_embeddings_unavailable')
     async with owned(request.app.state.pool, who[0], readonly=True) as conn:
-        rows = await conn.fetch('''SELECT *, ts_rank_cd(
+        if vector:
+            rows = await conn.fetch('''SELECT * FROM memories WHERE deleted_at IS NULL AND embedding IS NOT NULL
+              AND embedding_version=1 AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
+              ORDER BY embedding <=> $1::vector LIMIT 20''',vector,collection,starred)
+        else:
+            rows = await conn.fetch('''SELECT *, ts_rank_cd(
             to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text), plainto_tsquery('english',$1)) AS rank
-            FROM memories WHERE deleted_at IS NULL AND (
+            FROM memories WHERE deleted_at IS NULL AND ($1='' OR
               to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text) @@ plainto_tsquery('english',$1)
               OR strpos(lower(title || ' ' || user_note || ' ' || extracted_text || ' ' || collection || ' ' || array_to_string(labels,' ')),lower($1))>0)
-            ORDER BY rank DESC,updated_at DESC,id DESC LIMIT 50''', q.strip())
-    return {'items': [memory(row, detail=False) for row in rows]}
+            AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
+            ORDER BY rank DESC,updated_at DESC,id DESC LIMIT 50''', q.strip(),collection,starred)
+        pending = await conn.fetchval('SELECT count(*) FROM memories WHERE deleted_at IS NULL AND embedding IS NULL')
+    return {'items': [memory(row, detail=False) for row in rows], 'mode':mode,'pending_index':pending}
+
+
+@router.get('/collections')
+async def collections(request: Request, who=Depends(principal)):
+    async with owned(request.app.state.pool,who[0],readonly=True) as conn:
+        rows = await conn.fetch("SELECT collection,count(*) AS count FROM memories WHERE deleted_at IS NULL AND collection<>'' GROUP BY collection ORDER BY collection")
+    return {'items':[dict(row) for row in rows]}
 
 
 @router.get('/memories/{memory_id}')
@@ -189,6 +210,10 @@ async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depen
             collection=$5,version=version+1,updated_at=clock_timestamp() WHERE id=$6 RETURNING *''',
             values['title'], values['user_note'], values['starred'], values['archived'], values['collection'], memory_id)
         await publish(conn, who[0], updated, 'upsert')
+        if values['title']!=row['title'] or values['user_note']!=row['user_note']:
+            await conn.execute('UPDATE memories SET embedding=NULL,embedding_version=NULL WHERE id=$1',memory_id)
+            await conn.execute("""INSERT INTO ingestion_jobs(owner_id,memory_id) VALUES($1,$2)
+              ON CONFLICT(owner_id,memory_id) DO UPDATE SET state='queued',attempts=0,available_at=now(),lease_until=NULL,lease_id=NULL""",who[0],memory_id)
         return memory(updated)
 
 
