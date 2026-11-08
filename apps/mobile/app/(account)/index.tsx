@@ -27,10 +27,13 @@ export default function Inbox() {
         <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
           <Type>RECALLBOX</Type><TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
         </View>
-        <Type title>{store.archived ? 'Tucked away.' : 'Your little library.'}</Type>
+        <Type title>{store.archived ? 'Tucked away.' : 'Your library.'}</Type>
         <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A thought, a detail, a little thing worth keeping.'}</Type>
-        <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
         <Button label="Search your memories" onPress={() => router.push('/(account)/search')}/>
+        <View style={{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap'}}>
+          <TextAction label="＋ Write a note" onPress={() => router.push('/(account)/new')}/>
+          <TextAction label="＋ Save link or file" onPress={() => router.push('/(account)/capture')}/>
+        </View>
         <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
           onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
@@ -45,6 +48,7 @@ export default function Inbox() {
           style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
           <Type>{item.starred ? '★  ' : ''}{item.title || 'Untitled note'}</Type>
           <Type muted>{item.preview}</Type>
+          <Type muted>{item.kind.toUpperCase()} · {item.processing_state?.replace('_',' ')}{item.collection ? ` · ${item.collection}` : ''}</Type>
           <Type muted>{new Date(item.created_at).toLocaleDateString()}</Type>
         </Pressable>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>

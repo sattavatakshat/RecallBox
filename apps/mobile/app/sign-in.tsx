@@ -23,6 +23,7 @@ export default function SignIn() {
       const nonce = Crypto.randomUUID() + Crypto.randomUUID();
       const request = new AuthSession.AuthRequest({clientId: oidc.clientId, redirectUri: oidc.redirectUri,
         scopes: ['openid'], responseType: AuthSession.ResponseType.Code, usePKCE: true,
+        prompt: AuthSession.Prompt.Login,
         codeChallengeMethod: AuthSession.CodeChallengeMethod.S256, extraParams: {nonce}});
       await request.makeAuthUrlAsync(discovery);
       if (!request.codeVerifier) throw new Error('Secure sign-in unavailable.');
