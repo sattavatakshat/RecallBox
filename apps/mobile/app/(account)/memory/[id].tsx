@@ -54,19 +54,23 @@ export default function MemoryDetail() {
   async function original() {
     if(!base || busy) return;
     setBusy(true); setError('');
-    const file = new File(Paths.cache, `recallbox-${base.id}.${base.kind==='pdf'?'pdf':'image'}`);
+    let file: File | null = null;
+    let mime = 'application/octet-stream';
     try {
       await authorized(async token => {
         // Fetch with the same authorization and account-generation guard as notes.
         const response = await fetch(`${apiURL()}/v1/memories/${base.id}/asset`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});
         if(!response.ok) throw new ApiError(response.status,'asset_unavailable');
+        mime = response.headers.get('content-type')?.split(';')[0] || mime;
+        const extension = ({'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg','image/webp':'webp'} as Record<string,string>)[mime] || 'bin';
+        file = new File(Paths.cache, `recallbox-${base.id}.${extension}`);
         if (file.exists) file.delete();
         file.create();
         file.write(new Uint8Array(await response.arrayBuffer()));
       });
-      await Sharing.shareAsync(file.uri, {mimeType:base.kind==='pdf'?'application/pdf':undefined});
+      if(file) await Sharing.shareAsync((file as File).uri, {mimeType:mime});
     } catch(cause) {failed(cause);}
-    finally {if(file.exists) file.delete();setBusy(false);}
+    finally {if(file && (file as File).exists) (file as File).delete();setBusy(false);}
   }
   async function retryProcessing() {
     setBusy(true);setError('');
@@ -116,7 +120,7 @@ export default function MemoryDetail() {
       {!!base.source_url && <TextAction label="Open original source" onPress={() => void Linking.openURL(base.source_url!)}/>}
       {['image','pdf'].includes(base.kind) && <Button label="Open or share saved original" busy={busy} onPress={() => void original()}/>}
       {['failed','metadata_only'].includes(base.processing_state) && <TextAction label="Retry processing" disabled={busy} onPress={() => void retryProcessing()}/>}
-      {!!base.extracted_text && <View style={{gap: 12}}><Type>Saved source content</Type><Type muted>{base.extracted_text}</Type></View>}
+      {!!base.extracted_text && <View style={{gap: 12}}><Type>Saved source content</Type><Type muted>{base.extracted_text.slice(0,6000)}</Type>{base.extracted_text.length>6000 && <Notice>Showing the first 6,000 characters. The captured text is retained for search.</Notice>}</View>}
       {remote && remote.version > base.version && <>
         <Notice>This note has changed on another device. Your draft is unchanged.</Notice>
         <TextAction label="Compare with latest" disabled={busy} onPress={() => void compare()}/>
