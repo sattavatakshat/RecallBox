@@ -1,18 +1,14 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Linking } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import * as Crypto from 'expo-crypto';
+import { callbackParams, completeAuth } from './pending-auth';
+import { requireOptionalNativeModule } from 'expo';
 import { Account, api, ApiError, Exchange, Tokens } from './api';
 const KEY = 'recallbox.refresh.v1';
 const options = {keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY};
 type Session = { account: Account | null; loading: boolean; message: string; signIn: (data: Exchange) => Promise<void>; logout: () => Promise<void>; retry: () => Promise<void>; authorized: <T>(operation: (access: string) => Promise<T>) => Promise<T> };
 const Context = createContext<Session | null>(null);
 export const useSession = () => { const value = useContext(Context); if (!value) throw new Error('Session missing'); return value; };
-export async function deviceId() {
-  let id = await SecureStore.getItemAsync('recallbox.device.v1');
-  if (!id) { id = Crypto.randomUUID(); await SecureStore.setItemAsync('recallbox.device.v1', id, options); }
-  return id;
-}
 export function SessionProvider({children}: React.PropsWithChildren) {
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +88,22 @@ export function SessionProvider({children}: React.PropsWithChildren) {
     } finally { if (generation.current === epoch || !current.current) setLoading(false); }
   }
   useEffect(() => { void restore(); const subscription = AppState.addEventListener('change', state => { if (state === 'active') void restore(); }); return () => subscription.remove(); }, []);
+  useEffect(() => {
+    let alive=true;
+    async function callback(url: string) {
+      const params=callbackParams(url);
+      if(!params || !alive) return;
+      try {await completeAuth(params,signIn);await native?.consumeCallback();}
+      catch {if(alive && !current.current) setMessage('Sign-in was interrupted or expired. Please try again.');}
+    }
+    // Dev-client/native cold launches can restore the root route before Router
+    // mounts /auth/callback. Authentication must not depend on that screen.
+    void Linking.getInitialURL().then(url => {if(url) void callback(url);});
+    const native=requireOptionalNativeModule<{consumeCallback: () => Promise<string | null>}>('RecallBoxCallback');
+    if(native) void native.consumeCallback().then(url => {if(url) void callback(url);}).catch(() => undefined);
+    const listener=Linking.addEventListener('url',event => void callback(event.url));
+    return () => {alive=false;listener.remove();};
+  }, []);
   useEffect(() => {
     if (!account) return;
     const timer = setInterval(() => { if (AppState.currentState === 'active') void restore(); }, 9 * 60 * 1000);

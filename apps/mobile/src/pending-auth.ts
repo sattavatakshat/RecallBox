@@ -2,11 +2,18 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { Exchange } from './api';
 import { oidc } from './config';
-import { deviceId } from './session';
+import { deviceId } from './device';
 
 const KEY = 'recallbox.pkce.v1';
 type Pending = {state: string; verifier: string; nonce: string; created: number};
 let completing: Promise<void> | null = null;
+
+export function callbackParams(url: string) {
+  if (!url.startsWith(oidc.redirectUri+'?')) return null;
+  const query = new URL(url).searchParams;
+  if (query.getAll('state').length!==1 || query.getAll('code').length>1) return null;
+  return {state:query.get('state') || undefined,code:query.get('code') || undefined,error:query.get('error') || undefined};
+}
 
 export async function rememberAuth(state: string, verifier: string, nonce: string) {
   await SecureStore.setItemAsync(KEY, JSON.stringify({state, verifier, nonce, created: Date.now()}),

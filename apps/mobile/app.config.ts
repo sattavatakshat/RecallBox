@@ -9,7 +9,7 @@ const config: ExpoConfig = {
     action: 'VIEW', autoVerify: true, category: ['BROWSABLE', 'DEFAULT'],
     data: [{ scheme: 'https', host, pathPrefix: '/auth/callback' }],
   }] : [] },
-  plugins: ['expo-router', 'expo-secure-store', 'expo-web-browser', 'expo-status-bar', 'expo-document-picker',
+  plugins: ['./plugins/with-recallbox-callback', 'expo-router', 'expo-secure-store', 'expo-web-browser', 'expo-status-bar', 'expo-document-picker',
     ['expo-image-picker', {photosPermission: 'Choose images and screenshots to save to RecallBox.',cameraPermission: 'Take photos to save to RecallBox.',microphonePermission: false}]],
 };
 export default config;
