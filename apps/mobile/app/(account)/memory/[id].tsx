@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, View } from 'react-native';
+import { Alert, Image, ImageURISource, Linking, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { ApiError, Memory, memoriesApi } from '../../../src/api';
 import { apiURL } from '../../../src/config';
@@ -22,6 +22,8 @@ export default function MemoryDetail() {
   const [notice, setNotice] = useState(saved === '1' ? 'Saved to RecallBox.' : '');
   const [conflict, setConflict] = useState<Memory | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [imageSource,setImageSource] = useState<ImageURISource | null>(null);
+  const [imageError,setImageError] = useState(false);
   const opening = useRef(false);
   const dirty = Boolean(base && (title !== base.title || content !== base.content || collection !== base.collection));
   const release = usePreventRemove(dirty, ({repeat}) => {
@@ -46,6 +48,15 @@ export default function MemoryDetail() {
     finally { opening.current = false; setBusy(false); }
   }
   useFocusEffect(useCallback(() => { if (!base) void load(); }, [id, base, store.get]));
+  useEffect(() => {
+    let active=true;
+    setImageSource(null);setImageError(false);
+    if(base?.kind==='image' && ['ready','metadata_only'].includes(base.processing_state)) {
+      void authorized(async token => ({uri:`${apiURL()}/v1/memories/${base.id}/asset`,headers:{Authorization:`Bearer ${token}`},cache:'reload' as const}))
+        .then(source => {if(active) setImageSource(source);}).catch(() => {if(active) setImageError(true);});
+    }
+    return () => {active=false;};
+  }, [base?.id,base?.kind,base?.processing_state]);
   useEffect(() => {
     if (!base || !['queued','processing'].includes(base.processing_state) || dirty) return;
     const timer = setInterval(() => void load(), 4000);
@@ -110,7 +121,7 @@ export default function MemoryDetail() {
   const remote = store.items.find(note => note.id === id);
   return <Screen>
     <TextAction label="Back to inbox" onPress={() => router.replace('/(account)')}/>
-    <Type>{base?.kind?.toUpperCase() || 'YOUR MEMORY'}</Type><Type title>{base ? (base.title || 'A little thought.') : 'Opening your memory…'}</Type>
+    <Type>{base?.kind?.toUpperCase() || 'YOUR MEMORY'}</Type><Type title>{base ? (base.title || 'A little thought.') : unavailable ? 'Memory unavailable.' : 'Opening your memory…'}</Type>
     {!!notice && <Notice>{notice}</Notice>}{!!error && <Notice>{error}</Notice>}
     {!base && !busy && !unavailable && <Button label="Try again" onPress={() => void load()}/>}
     {base && <>
@@ -118,6 +129,8 @@ export default function MemoryDetail() {
       <Notice>{base.processing_state.replace('_',' ')}{base.processing_error ? ` · ${base.processing_error}` : ''}</Notice>
       {!!base.labels.length && <Type muted>{base.labels.join(' · ')}</Type>}
       {!!base.source_url && <TextAction label="Open original source" onPress={() => void Linking.openURL(base.source_url!)}/>}
+      {imageSource && !imageError && <Image accessibilityLabel="Saved image" source={imageSource} resizeMode="contain" style={{width:'100%',height:280,borderRadius:18}} onError={() => setImageError(true)}/>}
+      {imageError && <Notice>Preview could not load. Open the saved original below.</Notice>}
       {['image','pdf'].includes(base.kind) && <Button label="Open or share saved original" busy={busy} onPress={() => void original()}/>}
       {['failed','metadata_only'].includes(base.processing_state) && <TextAction label="Retry processing" disabled={busy} onPress={() => void retryProcessing()}/>}
       {!!base.extracted_text && <View style={{gap: 12}}><Type>Saved source content</Type><Type muted>{base.extracted_text.slice(0,6000)}</Type>{base.extracted_text.length>6000 && <Notice>Showing the first 6,000 characters. The captured text is retained for search.</Notice>}</View>}
