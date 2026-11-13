@@ -34,8 +34,10 @@ export default function Collections() {
     setBusy(true); setError(''); setNotice('');
     try {
       const result = await auth.current(access => collectionsApi.create(access, value));
+      // Creation is confirmed by the POST response. A follow-up list refresh
+      // can fail independently; do not report a successful save as uncertain.
       setName('');
-      await refresh();
+      setItems(previous => [result, ...previous.filter(item => item.id !== result.id)]);
       router.push({pathname: '/(account)/collection/[id]', params: {id: result.id}});
     } catch (cause) {
       setError(cause instanceof ApiError && cause.code === 'collection_name_exists'
@@ -68,6 +70,6 @@ export default function Collections() {
       <Type>{item.name}</Type>
       <Type muted>{item.item_count ?? 0} saved {item.item_count === 1 ? 'thing' : 'things'}</Type>
     </Pressable>)}
-    {hasMore && <Notice>Showing the newest 100 collections. Archive or remove older groups before adding more.</Notice>}
+    {hasMore && <Notice>Showing the newest 100 collections. Remove an unused group to make room for another.</Notice>}
   </Screen>;
 }
