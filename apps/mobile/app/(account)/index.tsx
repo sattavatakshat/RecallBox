@@ -21,14 +21,14 @@ export default function Inbox() {
   }
   return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}>
     <FlatList data={store.items} keyExtractor={note => note.id}
-      contentContainerStyle={{padding: 28, gap: 20, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
+      contentContainerStyle={{padding: tokens.space.large, gap: 12, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
       ListHeaderComponent={<View style={{gap: 20}}>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
           <Type>RECALLBOX</Type><TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
         </View>
-        <Type title>{store.archived ? 'Tucked away.' : 'Your little library.'}</Type>
-        <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A thought, a detail, a little thing worth keeping.'}</Type>
+        <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
+        <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A little space for what you want to remember.'}</Type>
         <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
         <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
           onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
@@ -36,10 +36,10 @@ export default function Inbox() {
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
       ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
-        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Begin with one thought.'}</Type>
+        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Your first saved thought.'}</Type>
           <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Write your first note. It will be saved privately to your account.'}</Type>
           {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
-      renderItem={({item}) => <View style={{borderWidth: 1, borderColor: p.line, borderRadius: tokens.radius, padding: 20, gap: 12}}>
+      renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || 'Untitled note'}`}
           style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
           <Type>{item.starred ? '★  ' : ''}{item.title || 'Untitled note'}</Type>
