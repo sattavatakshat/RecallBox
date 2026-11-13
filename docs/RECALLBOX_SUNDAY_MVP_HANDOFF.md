@@ -8,6 +8,7 @@
 - Preserve S1 Auth0/OIDC PKCE authentication and S2 private notes, versioned edits, archive/star, signed sync and row-level ownership.
 - Add a typed **link** memory using the existing durable create/retry, owner, revision and sync lifecycle. The original HTTP(S) URL is stored as `content`; no server-side fetching, extraction, scraping, previews, OCR, transcription or semantic classification.
 - Add `GET /v1/search?q=...` for **literal, case-insensitive keyword** matches against saved title and note/URL content, scoped to the signed-in owner. The response contains at most 50 newest matches and `has_more`; this is **not semantic search**, and there is no server-side pagination for search yet.
+- Add owner-scoped `starred=true` Library filtering with filter-bound signed pagination cursors. The original full-list cursor contract stays compatible when the new parameter is omitted.
 - Add native Expo save choice, Save Link and Search screens; open original HTTP(S) links with the device's URL handler. Keep the warm paper/forest editorial style from the 8 November UX blueprint; no invented results or unsupported feature navigation.
 
 ## Critical migration gate
@@ -47,6 +48,7 @@ unset RECALLBOX_MIGRATION_URL
 In another terminal, check local health, mobile deps and TypeScript:
 
 ```sh
+python3 scripts/recallbox_local_preflight.py  # read-only, prints status not secrets
 curl -fsS http://127.0.0.1:8001/v1/health
 cd /Users/akshat/Desktop/RecallBox/apps/mobile
 npm ci
@@ -66,7 +68,7 @@ For the existing Android emulator and debug build, reuse the documented SDK/JDK 
 | 4 | Open the saved link detail; tap **Open original link** | Device opens the supplied HTTP(S) source |
 | 5 | Search `example.com` and a unique word from the note | Both return as appropriate via literal keyword search; no AI/semantic claim |
 | 6 | Attempt to save `javascript:alert(1)`, a URL containing credentials, or malformed content | API rejects; no link memory created |
-| 7 | Star, archive, edit title, delete and refresh; relaunch app and API | Durable state and sync match changes; deleted items remain hidden |
+| 7 | Star, use Starred-only and Archive filters, edit title, delete and refresh; relaunch app and API | Correct filtered pagination, durable state and sync; deleted items remain hidden |
 | 8 | Sign out; sign back into original account; sign into another test account | Unauthenticated pages cannot show private data; account B cannot access account A notes, links or search |
 | 9 | Try offline/network failure during a save | UI says save is not confirmed and supports retry with the same idempotency key; no fabricated checkmark |
 
@@ -79,6 +81,7 @@ Capture **PASS / FAIL / BLOCKED** per step with actual Git SHA, app version, emu
 - Search is literal keyword matching, returning at most the 50 newest results; no embeddings, model, search ranking, categorization or semantic memory lookup.
 - Saving a URL stores an original link only; no SSRF-exposed worker or remote scraping endpoint is introduced.
 - No real device APK build, Expo typecheck, authenticated service smoke, migration, iOS release acceptance, security audit, backup restore, public hosting or full production validation has been performed by this GitHub-only task.
+- A read-only `scripts/recallbox_local_preflight.py` checks local branch/config presence and loopback port reachability **without revealing environment values**. It does not authenticate, migrate, or verify any note contents.
 - Existing extractor and benchmark modules are unchanged. This feature branch is a **local beta prototype** only.
 
 ## Design authority and remaining screens
