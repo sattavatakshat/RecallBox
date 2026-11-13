@@ -31,8 +31,8 @@ export default function SearchLibrary() {
     <TextAction label="Back to library" onPress={() => router.replace('/(account)')}/>
     <Type>YOUR LIBRARY / SEARCH</Type>
     <Type title>Find something you saved.</Type>
-    <Type muted>Find words in your saved titles, notes, and links. Semantic search is not available yet.</Type>
-    <Input label="Search your library" value={query} onChangeText={setQuery}
+    <Type muted>Search the words in saved titles, notes, and original links.</Type>
+    <Input label="Search your library" value={query} onChangeText={setQuery} autoFocus
       returnKeyType="search" onSubmitEditing={() => void search()}
       maxLength={160} placeholder="Goa, Java, a restaurant…"
       autoCapitalize="none" autoCorrect={false}/>
