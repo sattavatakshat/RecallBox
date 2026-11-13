@@ -142,7 +142,7 @@ async def create_note(body: CreateNote, request: Request,
 @router.get('/memories')
 async def list_notes(request: Request, cursor: str | None = Query(default=None, max_length=4096),
                      limit: int = Query(default=20, ge=1, le=50), archived: bool = False,
-                     who=Depends(principal)):
+                     starred: bool | None = None, who=Depends(principal)):
     owner = who[0]
     async with owned(request.app.state.pool, owner, isolation='repeatable_read', readonly=True) as conn:
         user = await conn.fetchrow('SELECT sync_sequence,sync_epoch FROM users WHERE id=$1', owner)
@@ -151,7 +151,8 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
         if cursor:
             state = decode(request.app.state.settings, cursor, owner, user['sync_epoch'], 'list')
             try:
-                if state['archived'] != archived or type(state['high']) is not int or not 0 <= state['high'] <= high:
+                if (state['archived'] != archived or state.get('starred') != starred
+                        or type(state['high']) is not int or not 0 <= state['high'] <= high):
                     raise ValueError()
                 high = state['high']
                 before_time, before_id = datetime.fromisoformat(state['before_time']), UUID(state['before_id'])
@@ -160,15 +161,16 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
             except (KeyError, TypeError, ValueError):
                 raise Problem(400, 'invalid_cursor') from None
         rows = await conn.fetch(f'''SELECT {summary_columns()} FROM memories WHERE owner_id=$1 AND deleted_at IS NULL
-            AND archived=$2 AND created_sequence<=$3
-            AND ($4::timestamptz IS NULL OR (created_at,id)<($4,$5::uuid))
-            ORDER BY created_at DESC,id DESC LIMIT $6''', owner, archived, high, before_time, before_id, limit+1)
+            AND archived=$2 AND ($3::boolean IS NULL OR starred=$3) AND created_sequence<=$4
+            AND ($5::timestamptz IS NULL OR (created_at,id)<($5,$6::uuid))
+            ORDER BY created_at DESC,id DESC LIMIT $7''', owner, archived, starred, high, before_time, before_id, limit+1)
         page = rows[:limit]
         next_cursor = None
         if len(rows) > limit:
             last = page[-1]
             next_cursor = encode(request.app.state.settings, owner, user['sync_epoch'], 'list',
-                                 high=high, archived=archived, before_time=last['created_at'].isoformat(), before_id=str(last['id']))
+                                 high=high, archived=archived, starred=starred,
+                                 before_time=last['created_at'].isoformat(), before_id=str(last['id']))
         return {'items': [memory(row, detail=False) for row in page], 'next_cursor': next_cursor,
                 'sync_cursor': encode(request.app.state.settings, owner, user['sync_epoch'], 'sync', after=high)}
 
