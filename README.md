@@ -24,7 +24,7 @@ Universal URL Extractor aims to make this work **modular, measurable, and transp
 | | Universal URL Extractor | RecallBox |
 |---|---|---|
 | **What it is** | Reusable developer infrastructure | Private native personal-memory application (prototype) |
-| **Status** | Working experimental implementation in this repo | Source implemented for authentication, owned notes and draft link bookmarks; real-device acceptance pending |
+| **Status** | Working experimental implementation in this repo | Source implemented for authentication, owned notes and draft link bookmarks and manual Collections; real-device acceptance pending |
 | **Focus** | URL extraction, normalized output, engine benchmarking | Save, rediscover, and eventually act on personal saved content |
 | **Typical user** | Developers, researchers, knowledge-system builders | People saving links, articles, screenshots, and notes |
 | **Boundary** | Does **not** provide semantic search, user accounts, or a consumer UI | Separate FastAPI/Expo stack; not yet connected to extractor workers |
@@ -183,8 +183,8 @@ cursor-based mobile Inbox/sync client. See the
 and [API contract](docs/RECALLBOX_S2_API.md). Real database/provider/device acceptance
 remains blocked; no public deployment is configured.
 
-The draft Sunday MVP branch additionally implements saved HTTP(S) bookmarks and
+The draft Sunday MVP branch additionally implements saved HTTP(S) bookmarks, manual Collections and
 owner-scoped **literal keyword search** (not semantic search). It requires additive
-migration `0003_bookmark_links` and Android/operator acceptance before any merge
+migrations through `0004_collections` and Android/operator acceptance before any merge
 or beta declaration. See [Sunday manual handoff](docs/RECALLBOX_SUNDAY_MVP_HANDOFF.md)
 and [draft PR #3](https://github.com/sattavatakshat/RecallBox/pull/3).
