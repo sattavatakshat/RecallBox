@@ -127,7 +127,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
         } catch (cause) {
           if (cause instanceof ApiError && cause.status === 410) {
             setNotice('Your sync position expired. The inbox was refreshed; open drafts are unchanged.');
-            await first(view.current);
+            await first(view.current, starredView.current);
           } else { if (alive.current) setError(errorMessage(cause)); }
         }
       });
