@@ -38,8 +38,9 @@ export type SyncChange = {sequence: string} & (
 );
 export type SyncPage = {changes: SyncChange[]; has_more: boolean; next_cursor: string};
 export const memoriesApi = {
-  list: (access: string, archived: boolean, cursor?: string) => request<MemoryPage>(
-    `/memories?archived=${archived}&limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, access),
+  list: (access: string, archived: boolean, cursor?: string, starredOnly = false) => request<MemoryPage>(
+    `/memories?archived=${archived}&limit=20${starredOnly ? '&starred=true' : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+    'GET', undefined, access),
   get: (access: string, id: string) => request<Memory>(`/memories/${encodeURIComponent(id)}`, 'GET', undefined, access),
   create: (access: string, body: MemoryCreate, key: string) => request<Memory>(
     '/memories', 'POST', body, access, {'Idempotency-Key': key}),
