@@ -31,7 +31,14 @@ export default function Inbox() {
         </View>
         </View>
         <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
-        <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A little space for what you want to remember.'}</Type>
+        <Type muted>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : 'A little space for what you want to remember.'}</Type>
+        <Pressable accessibilityRole="button" accessibilityLabel="Find something you saved"
+          onPress={() => router.push('/(account)/search')}
+          style={({pressed}) => ({minHeight: 56, paddingHorizontal: 18, paddingVertical: 16,
+            borderRadius: tokens.radius, borderWidth: 1, borderColor: p.line,
+            backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
+          <Type muted>Find something you saved…</Type>
+        </Pressable>
         <Button label="Save something" onPress={() => router.push('/(account)/save')}/>
         <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
           onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
