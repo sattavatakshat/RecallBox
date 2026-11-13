@@ -117,8 +117,10 @@ export default function MemoryDetail() {
         onPress={() => void openOriginal()}/>}
       <Button label="Save changes" busy={busy} disabled={!dirty || !content.trim() || unavailable || Boolean(conflict)}
         onPress={() => void update({title, content})}/>
+      <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
+        onPress={() => router.push({pathname: '/(account)/add-to-collection', params: {memoryId: id}})}/>
       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
-        <TextAction label={base.starred ? 'Unstar note' : 'Star note'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({starred: !base.starred})}/>
+        <TextAction label={base.starred ? 'Unstar' : 'Star'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({starred: !base.starred})}/>
         <TextAction label={base.archived ? 'Move to inbox' : 'Archive note'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({archived: !base.archived})}/>
         <TextAction label={base.kind === 'link' ? 'Delete saved link' : 'Delete note'} disabled={busy || unavailable} onPress={confirmDelete}/>
       </View>
