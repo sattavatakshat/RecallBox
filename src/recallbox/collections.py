@@ -36,11 +36,13 @@ class CollectionRename(CollectionCreate):
 
 
 def format_collection(row):
-    return jsonable_encoder({
+    result = {
         'id': row['id'], 'name': row['name'], 'version': row['version'],
         'created_at': row['created_at'], 'updated_at': row['updated_at'],
-        'item_count': row.get('item_count', 0)
-    })
+    }
+    if 'item_count' in row:
+        result['item_count'] = row['item_count']
+    return jsonable_encoder(result)
 
 
 async def find_collection(conn, owner, collection_id, *, locked=False):
