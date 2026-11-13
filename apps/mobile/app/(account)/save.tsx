@@ -9,7 +9,7 @@ export default function SaveSomething() {
     <Type title>Save something.</Type>
     <Type muted>Keep a useful link or a thought. They’ll be here when you need them.</Type>
     <Button label="Paste a link" onPress={() => router.push('/(account)/new-link')}/>
-    <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
+    <Button label="Write a note" variant="secondary" onPress={() => router.push('/(account)/new')}/>
     <Type muted>Photos, PDFs and other media need a separate, verified import flow before they appear here.</Type>
   </Screen>;
 }
