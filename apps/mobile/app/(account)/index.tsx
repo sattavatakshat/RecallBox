@@ -27,6 +27,7 @@ export default function Inbox() {
         <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
           <Type>RECALLBOX</Type><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
           <TextAction label="Search" onPress={() => router.push('/(account)/search')}/>
+          <TextAction label="Collections" onPress={() => router.push('/(account)/collections')}/>
           <TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
         </View>
         </View>
