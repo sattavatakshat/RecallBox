@@ -16,9 +16,22 @@ export function Screen({children}: React.PropsWithChildren) {
   const p = usePalette();
   return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}><KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{flexGrow: 1, padding: 24, gap: 24, maxWidth: tokens.width, width: '100%', alignSelf: 'center'}}>{children}</ScrollView></KeyboardAvoidingView></SafeAreaView>;
 }
-export function Button({label, onPress, busy = false, disabled = false}: {label: string; onPress: () => void; busy?: boolean; disabled?: boolean}) {
+export function Button({label, onPress, busy = false, disabled = false, variant = 'primary'}: {
+  label: string; onPress: () => void; busy?: boolean; disabled?: boolean;
+  variant?: 'primary' | 'secondary';
+}) {
   const p = usePalette();
-  return <Pressable accessibilityRole="button" accessibilityState={{disabled: disabled || busy, busy}} disabled={disabled || busy} onPress={onPress} style={({pressed}) => ({minHeight: 56, borderRadius: tokens.radius, backgroundColor: p.accent, padding: 16, justifyContent: 'center', opacity: pressed || disabled ? 0.6 : 1})}>{busy ? <ActivityIndicator accessibilityLabel="Please wait" color={p.onAccent}/> : <Text style={{color: p.onAccent, fontSize: 17, fontWeight: '600', textAlign: 'center'}}>{label}</Text>}</Pressable>;
+  const secondary = variant === 'secondary';
+  const foreground = secondary ? p.ink : p.onAccent;
+  return <Pressable accessibilityRole="button" accessibilityState={{disabled: disabled || busy, busy}}
+    disabled={disabled || busy} onPress={onPress}
+    style={({pressed}) => ({minHeight: 56, borderRadius: tokens.radius, padding: 16, justifyContent: 'center',
+      backgroundColor: secondary ? p.surface : p.accent,
+      borderWidth: secondary ? 1 : 0, borderColor: p.line,
+      opacity: pressed || disabled ? 0.6 : 1})}>
+    {busy ? <ActivityIndicator accessibilityLabel="Please wait" color={foreground}/> :
+      <Text style={{color: foreground, fontSize: 16, fontWeight: '600', textAlign: 'center'}}>{label}</Text>}
+  </Pressable>;
 }
 export function Input({label, ...props}: TextInputProps & {label: string}) {
   const p = usePalette();
