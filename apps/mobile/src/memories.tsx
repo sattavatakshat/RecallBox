@@ -1,13 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { ApiError, Memory, MemoryEdit, MemorySummary, memoriesApi } from './api';
+import { ApiError, Memory, MemoryCreate, MemoryEdit, MemorySummary, memoriesApi } from './api';
 import { useSession } from './session';
 
 type Store = {
   items: MemorySummary[]; archived: boolean; loading: boolean; error: string; hasMore: boolean; notice: string;
   refresh: (archived?: boolean) => Promise<void>; more: () => Promise<void>; sync: () => Promise<void>;
   get: (id: string) => Promise<Memory>;
-  create: (body: {title: string; content: string}, key: string) => Promise<Memory>;
+  create: (body: MemoryCreate, key: string) => Promise<Memory>;
   edit: (id: string, body: MemoryEdit) => Promise<Memory>;
   remove: (id: string, version: number) => Promise<void>;
 };
@@ -131,7 +131,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     } finally { polling.current = false; }
   }, [run]);
   const get = useCallback((id: string) => run(() => auth.current(token => memoriesApi.get(token, id))), [run]);
-  const create = useCallback((body: {title: string; content: string}, key: string) => run(async () => {
+  const create = useCallback((body: MemoryCreate, key: string) => run(async () => {
     const note = await auth.current(token => memoriesApi.create(token, body, key));
     if (alive.current) { merge(summary(note)); publish(); }
     return note;
