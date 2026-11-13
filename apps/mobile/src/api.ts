@@ -53,3 +53,27 @@ export const memoriesApi = {
   sync: (access: string, cursor: string) => request<SyncPage>(
     `/sync?limit=20&cursor=${encodeURIComponent(cursor)}`, 'GET', undefined, access),
 };
+
+export type Collection = {
+  id: string; name: string; version: number; created_at: string;
+  updated_at: string; item_count?: number;
+};
+export type CollectionsPage = {items: Collection[]; has_more: boolean};
+export type CollectionDetail = Collection & {items: MemorySummary[]; has_more: boolean};
+export const collectionsApi = {
+  list: (access: string) => request<CollectionsPage>('/collections?limit=100', 'GET', undefined, access),
+  get: (access: string, id: string) => request<CollectionDetail>(
+    `/collections/${encodeURIComponent(id)}?limit=100`, 'GET', undefined, access),
+  create: (access: string, name: string) => request<Collection>(
+    '/collections', 'POST', {name}, access),
+  rename: (access: string, id: string, name: string, version: number) => request<Collection>(
+    `/collections/${encodeURIComponent(id)}`, 'PATCH', {name, expected_version: version}, access),
+  remove: (access: string, id: string, version: number) => request<void>(
+    `/collections/${encodeURIComponent(id)}?expected_version=${version}`, 'DELETE', undefined, access),
+  add: (access: string, collectionId: string, memoryId: string) => request<void>(
+    `/collections/${encodeURIComponent(collectionId)}/memories/${encodeURIComponent(memoryId)}`,
+    'PUT', undefined, access),
+  removeItem: (access: string, collectionId: string, memoryId: string) => request<void>(
+    `/collections/${encodeURIComponent(collectionId)}/memories/${encodeURIComponent(memoryId)}`,
+    'DELETE', undefined, access),
+};
