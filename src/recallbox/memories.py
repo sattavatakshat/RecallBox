@@ -211,7 +211,10 @@ async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depen
         for field in body.model_fields_set - {'expected_version'}:
             values['user_note' if field == 'content' else field] = getattr(body, field)
         if row['kind'] == 'link':
-            require_http_bookmark(values['user_note'])
+            try:
+                require_http_bookmark(values['user_note'])
+            except ValueError:
+                raise Problem(422, 'invalid_request') from None
         if all(values[k] == row[k] for k in ('title', 'user_note', 'starred', 'archived')):
             return memory(row)
         updated = await conn.fetchrow('''UPDATE memories SET title=$1,user_note=$2,starred=$3,archived=$4,
