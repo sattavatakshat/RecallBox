@@ -66,7 +66,12 @@ export default function CollectionScreen() {
         setBusy(true); setError('');
         try {
           await auth.current(access => collectionsApi.removeItem(access, id, memoryId));
-          await refresh();
+          // The DELETE is confirmed independently of a later network refresh.
+          // Never report a successful removal as failed because a GET failed.
+          setData(current => current ? {
+            ...current,
+            items: current.items.filter(item => item.id !== memoryId),
+          } : current);
           setNotice('Removed from this collection. The memory was kept.');
         } catch {
           setError('Could not remove that item. Try again.');
