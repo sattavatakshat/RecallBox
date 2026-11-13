@@ -58,7 +58,7 @@ export default function NewLink() {
     <TextAction label="Back to save" onPress={() => router.back()}/>
     <Type>ONE LINK TO KEEP</Type>
     <Type title>Save a link.</Type>
-    <Type muted>No automatic scraping. Your original URL is saved as a bookmark you can reopen.</Type>
+    <Type muted>Keep the original address, then find it again whenever you need it.</Type>
     <Input label="Link" value={url} onChangeText={setUrl} keyboardType="url"
       autoCapitalize="none" autoCorrect={false} maxLength={4096}
       editable={!locked && !busy} placeholder="https://example.com/article"/>
