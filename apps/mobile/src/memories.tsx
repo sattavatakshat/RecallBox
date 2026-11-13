@@ -4,8 +4,8 @@ import { ApiError, Memory, MemoryCreate, MemoryEdit, MemorySummary, memoriesApi 
 import { useSession } from './session';
 
 type Store = {
-  items: MemorySummary[]; archived: boolean; loading: boolean; error: string; hasMore: boolean; notice: string;
-  refresh: (archived?: boolean) => Promise<void>; more: () => Promise<void>; sync: () => Promise<void>;
+  items: MemorySummary[]; archived: boolean; starredOnly: boolean; loading: boolean; error: string; hasMore: boolean; notice: string;
+  refresh: (archived?: boolean, starred?: boolean) => Promise<void>; more: () => Promise<void>; sync: () => Promise<void>;
   get: (id: string) => Promise<Memory>;
   create: (body: MemoryCreate, key: string) => Promise<Memory>;
   edit: (id: string, body: MemoryEdit) => Promise<Memory>;
@@ -41,10 +41,12 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   const pageCursor = useRef<string | null>(null);
   const syncCursor = useRef<string | null>(null);
   const view = useRef(false);
+  const starredView = useRef(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const polling = useRef(false);
   const [items, setItems] = useState<MemorySummary[]>([]);
   const [archived, setArchived] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -62,21 +64,23 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   }, []);
   function publish() {
     if (!alive.current) return;
-    setItems([...records.current.values()].filter(note => note.archived === view.current)
+    setItems([...records.current.values()].filter(note =>
+      note.archived === view.current && (!starredView.current || note.starred))
       .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)));
   }
   function merge(note: MemorySummary) {
     const old = records.current.get(note.id);
     if (!old || note.version >= old.version) records.current.set(note.id, note);
   }
-  async function first(archive: boolean) {
+  async function first(archive: boolean, stars: boolean) {
     if (alive.current) {setLoading(true); setError('');}
     try {
-      const page = await auth.current(token => memoriesApi.list(token, archive));
+      const page = await auth.current(token => memoriesApi.list(token, archive, undefined, stars));
       if (!alive.current) return;
       records.current.clear();
       for (const note of page.items) merge(note);
       view.current = archive; setArchived(archive);
+      starredView.current = stars; setStarredOnly(stars);
       pageCursor.current = page.next_cursor; setHasMore(Boolean(page.next_cursor));
       syncCursor.current = page.sync_cursor;
       publish();
@@ -85,19 +89,20 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
       throw cause;
     } finally { if (alive.current) setLoading(false); }
   }
-  const refresh = useCallback((archive?: boolean) => run(() => first(archive ?? view.current)), [run]);
+  const refresh = useCallback((archive?: boolean, stars?: boolean) => run(() =>
+    first(archive ?? view.current, stars ?? starredView.current)), [run]);
   const more = useCallback(() => run(async () => {
     if (!pageCursor.current) return;
     setLoading(true); setError('');
     try {
-      const page = await auth.current(token => memoriesApi.list(token, view.current, pageCursor.current!));
+      const page = await auth.current(token => memoriesApi.list(token, view.current, pageCursor.current!, starredView.current));
       if (!alive.current) return;
       for (const note of page.items) merge(note);
       pageCursor.current = page.next_cursor; setHasMore(Boolean(page.next_cursor));
       // Keep the FIRST page's sync cursor: later list requests must not skip changes.
       publish();
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 410) await first(view.current);
+      if (cause instanceof ApiError && cause.status === 410) await first(view.current, starredView.current);
       else { if (alive.current) setError(errorMessage(cause)); throw cause; }
     } finally { if (alive.current) setLoading(false); }
   }), [run]);
@@ -152,5 +157,5 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     const timer = setInterval(() => { if (AppState.currentState === 'active') void sync(); }, 15000);
     return () => { alive.current = false; records.current.clear(); syncCursor.current = null; pageCursor.current = null; listener.remove(); clearInterval(timer); };
   }, [refresh, sync]);
-  return <Context.Provider value={{items, archived, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove}}>{children}</Context.Provider>;
+  return <Context.Provider value={{items, archived, starredOnly, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove}}>{children}</Context.Provider>;
 }
