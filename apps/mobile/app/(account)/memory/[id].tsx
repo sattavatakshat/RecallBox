@@ -16,13 +16,14 @@ export default function MemoryDetail() {
   const [notice, setNotice] = useState(saved === '1' ? 'Saved to RecallBox.' : '');
   const [conflict, setConflict] = useState<Memory | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const opening = useRef(false);
   const dirty = Boolean(base && (title !== base.title || content !== base.content));
-  const release = usePreventRemove(dirty, ({repeat}) => {
+  const release = usePreventRemove(dirty && !leaving, ({repeat}) => {
     if (busy) { Alert.alert('Saving changes', 'Wait for the request to finish.'); return; }
     Alert.alert('Leave your draft?', 'Your unsaved edits will be discarded.', [
       {text: 'Keep editing', style: 'cancel'},
-      {text: 'Discard edits', style: 'destructive', onPress: () => { release(); repeat(); }},
+      {text: 'Discard edits', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
     ]);
   });
   function failed(cause: unknown) {
@@ -63,7 +64,7 @@ export default function MemoryDetail() {
       {text: 'Keep note', style: 'cancel'},
       {text: 'Delete note', style: 'destructive', onPress: () => void (async () => {
         setBusy(true); setError('');
-        try { await store.remove(id, base.version); release(); router.replace('/(account)'); }
+        try { await store.remove(id, base.version); setLeaving(true); release(); router.replace('/(account)'); }
         catch (cause) { failed(cause); }
         finally { setBusy(false); }
       })()},
