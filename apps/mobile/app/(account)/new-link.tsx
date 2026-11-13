@@ -13,8 +13,9 @@ export default function NewLink() {
   const [busy, setBusy] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState('');
+  const [leaving, setLeaving] = useState(false);
   const attempt = useRef<{key: string; title: string; url: string} | null>(null);
-  const release = usePreventRemove(Boolean(title || url), ({repeat}) => {
+  const release = usePreventRemove(Boolean(title || url) && !leaving, ({repeat}) => {
     if (busy) {
       Alert.alert('Save in progress', 'Wait for the save to finish before leaving.');
       return;
@@ -23,7 +24,7 @@ export default function NewLink() {
       ? 'The save may have succeeded. Retry here with the same key, or check your library.'
       : 'This link has not been saved. Leaving discards your draft.', [
       {text: 'Keep editing', style: 'cancel'},
-      {text: 'Leave', style: 'destructive', onPress: () => { release(); repeat(); }},
+      {text: 'Leave', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
     ]);
   });
 
@@ -38,6 +39,7 @@ export default function NewLink() {
       const result = await create({
         kind: 'link', title: attempt.current.title, content: attempt.current.url,
       }, attempt.current.key);
+      setLeaving(true);
       release();
       router.replace({pathname: '/(account)/memory/[id]', params: {id: result.id, saved: '1'}});
     } catch (cause) {
