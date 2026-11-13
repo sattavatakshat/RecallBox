@@ -33,5 +33,5 @@ export default function SignIn() {
     } catch { setError('Sign-in could not be completed. Check your connection and try again.'); }
     finally { setBusy(false); }
   }
-  return <Screen><Type>YOUR FIRST PAGE</Type><Type title>A space that’s yours.</Type><Type muted>Continue securely in your browser, then come back here.</Type>{!configured && <Notice>Sign-in is awaiting identity-provider setup. No account can be created yet.</Notice>}{error && <Notice>{error}</Notice>}<Button label="Continue securely" onPress={() => void login()} busy={busy} disabled={!configured}/><Button label="Back to welcome" onPress={() => router.replace('/')}/></Screen>;
+  return <Screen><Type>YOUR FIRST PAGE</Type><Type title>A space that’s yours.</Type><Type muted>Continue securely in your browser, then come back here.</Type>{!configured && <Notice>Sign-in is awaiting identity-provider setup. No account can be created yet.</Notice>}{error && <Notice>{error}</Notice>}<Button label="Continue securely" onPress={() => void login()} busy={busy} disabled={!configured}/><Button label="Back to welcome" variant="secondary" onPress={() => router.replace('/')}/></Screen>;
 }
