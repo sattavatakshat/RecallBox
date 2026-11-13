@@ -40,14 +40,18 @@ export default function Inbox() {
           <Type muted>Find something you saved…</Type>
         </Pressable>
         <Button label="Save something" onPress={() => router.push('/(account)/save')}/>
-        <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
-          onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
+          <TextAction label={store.starredOnly ? 'All saved' : 'Starred only'} disabled={store.loading}
+            onPress={() => void store.refresh(store.archived, !store.starredOnly).catch(() => undefined)}/>
+          <TextAction label={store.archived ? 'Return to library' : 'Open archive'} disabled={store.loading}
+            onPress={() => void store.refresh(!store.archived, store.starredOnly).catch(() => undefined)}/>
+        </View>
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
       ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
-        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Your first saved thing.'}</Type>
-          <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Save a useful link or write a thought. It will stay in your private library.'}</Type>
+        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.starredOnly ? 'No starred memories yet.' : (store.archived ? 'Nothing tucked away.' : 'Your first saved thing.')}</Type>
+          <Type muted>{store.starredOnly ? 'Star a saved note or link to keep it close.' : (store.archived ? 'Archived notes and links will appear here.' : 'Save a useful link or write a thought. It will stay in your private library.')}</Type>
           {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
       renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}`}
