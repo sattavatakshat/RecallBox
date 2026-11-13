@@ -61,7 +61,8 @@ export default function Collections() {
       <TextAction label="Refresh" disabled={loading || busy} onPress={() => void refresh()}/>
     </View>
     {loading && <ActivityIndicator accessibilityLabel="Loading collections" color={p.ink}/>}
-    {!loading && items.length === 0 && <Notice>No collections yet. Create one to organize a few favorites.</Notice>}
+    {!loading && !error && items.length === 0 && <Notice>No collections yet. Create one to organize a few favorites.</Notice>}
+    {!!error && items.length > 0 && <Notice>Showing previously loaded collections. Refresh to check for changes.</Notice>}
     {items.map(item => <Pressable key={item.id} accessibilityRole="button"
       accessibilityLabel={`Open collection ${item.name}`}
       onPress={() => router.push({pathname: '/(account)/collection/[id]', params: {id: item.id}})}
