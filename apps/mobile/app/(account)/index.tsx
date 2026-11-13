@@ -25,11 +25,14 @@ export default function Inbox() {
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
       ListHeaderComponent={<View style={{gap: 20}}>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
-          <Type>RECALLBOX</Type><TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
+          <Type>RECALLBOX</Type><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
+          <TextAction label="Search" onPress={() => router.push('/(account)/search')}/>
+          <TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
+        </View>
         </View>
         <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
         <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A little space for what you want to remember.'}</Type>
-        <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
+        <Button label="Save something" onPress={() => router.push('/(account)/save')}/>
         <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
           onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
@@ -37,13 +40,14 @@ export default function Inbox() {
       </View>}
       ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
         <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Your first saved thought.'}</Type>
-          <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Write your first note. It will be saved privately to your account.'}</Type>
+          <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Save a useful link or write a thought. It will stay in your private library.'}</Type>
           {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
       renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || 'Untitled note'}`}
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}`}
           style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
-          <Type>{item.starred ? '★  ' : ''}{item.title || 'Untitled note'}</Type>
+          <Type>{item.starred ? '★  ' : ''}{item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}</Type>
           <Type muted>{item.preview}</Type>
+          <Type muted>{item.kind === 'link' ? 'SAVED LINK' : 'NOTE'}</Type>
           <Type muted>{new Date(item.created_at).toLocaleDateString()}</Type>
         </Pressable>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
