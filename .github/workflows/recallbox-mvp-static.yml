@@ -8,10 +8,6 @@ on:
       - 'migrations/**'
       - 'scripts/recallbox_local_preflight.py'
       - '.github/workflows/recallbox-mvp-static.yml'
-  push:
-    branches:
-      - 'feat/recallbox-sunday-mvp-20261115'
-
 permissions:
   contents: read
 
