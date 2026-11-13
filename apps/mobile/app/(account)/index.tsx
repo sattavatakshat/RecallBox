@@ -46,7 +46,7 @@ export default function Inbox() {
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
       ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
-        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Your first saved thought.'}</Type>
+        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Your first saved thing.'}</Type>
           <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Save a useful link or write a thought. It will stay in your private library.'}</Type>
           {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
       renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
