@@ -27,7 +27,9 @@ export default function MemoryDetail() {
     ]);
   });
   function failed(cause: unknown) {
-    setError(errorMessage(cause));
+    setError(base?.kind === 'link' && cause instanceof ApiError && cause.status === 422
+      ? 'Use a complete http:// or https:// link without spaces or sign-in credentials.'
+      : errorMessage(cause));
     if (cause instanceof ApiError && cause.code === 'version_conflict' && cause.current) setConflict(cause.current);
     if (cause instanceof ApiError && (cause.status === 404 || cause.status === 410)) setUnavailable(true);
   }
