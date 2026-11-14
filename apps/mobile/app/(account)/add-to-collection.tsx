@@ -48,7 +48,8 @@ export default function AddToCollection() {
     {!!notice && <Notice>{notice}</Notice>}
     {!!error && <Notice>{error}</Notice>}
     {loading && <ActivityIndicator color={p.ink} accessibilityLabel="Loading collections"/>}
-    {!loading && !items.length && <Notice>No collections yet. Create one first, then return to this memory.</Notice>}
+    {!loading && !error && !items.length && <Notice>No collections yet. Create one first, then return to this memory.</Notice>}
+    {!!error && items.length > 0 && <Notice>Showing previously loaded collections. Refresh before relying on this list.</Notice>}
     <View style={{gap: 10}}>
       {items.map(item => <Button key={item.id} label={`Add to ${item.name}`}
         variant="secondary" busy={working === item.id} disabled={Boolean(working)}
