@@ -6,6 +6,7 @@ import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { configured, oidc } from '../src/config';
 import { deviceId, useSession } from '../src/session';
+import { ApiError } from '../src/api';
 import { Button, Notice, Screen, Type } from '../src/ui';
 WebBrowser.maybeCompleteAuthSession();
 export default function SignIn() {
@@ -30,8 +31,17 @@ export default function SignIn() {
       await signIn({provider: oidc.provider, code: result.params.code, code_verifier: request.codeVerifier,
         nonce, client_device_id: await deviceId(), platform: Platform.OS as 'ios' | 'android'});
       router.replace('/(account)');
-    } catch { setError('Sign-in could not be completed. Check your connection and try again.'); }
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'identity_rejected') {
+        setError('The identity service could not verify this sign-in. Start a new sign-in attempt.');
+      } else if (cause instanceof ApiError && cause.status === 503) {
+        setError('Your local RecallBox server is unavailable. Check that it is running before retrying.');
+      } else {
+        // Do not display authorization codes, token responses or provider URLs.
+        setError('Sign-in could not be completed. Check your connection and try again.');
+      }
+    }
     finally { setBusy(false); }
   }
-  return <Screen><Type>YOUR FIRST PAGE</Type><Type title>A space that’s yours.</Type><Type muted>Continue securely in your browser, then come back here.</Type>{!configured && <Notice>Sign-in is awaiting identity-provider setup. No account can be created yet.</Notice>}{error && <Notice>{error}</Notice>}<Button label="Continue securely" onPress={() => void login()} busy={busy} disabled={!configured}/><Button label="Back to welcome" onPress={() => router.replace('/')}/></Screen>;
+  return <Screen><Type>YOUR FIRST PAGE</Type><Type title>A space that’s yours.</Type><Type muted>Continue securely in your browser, then come back here.</Type>{!configured && <Notice>Sign-in is awaiting identity-provider setup. No account can be created yet.</Notice>}{error && <Notice>{error}</Notice>}<Button label="Continue securely" onPress={() => void login()} busy={busy} disabled={!configured}/><Button label="Back to welcome" variant="secondary" onPress={() => router.replace('/')}/></Screen>;
 }

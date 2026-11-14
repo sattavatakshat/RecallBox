@@ -4,6 +4,8 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime
 from uuid import UUID, uuid4
+from typing import Literal
+from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -15,8 +17,26 @@ from .problems import Problem
 router = APIRouter(prefix='/v1')
 
 
+def require_http_bookmark(value: str) -> None:
+    """Validate an address for storage/opening only; no server-side fetch occurs."""
+    if (not value or len(value) > 4096 or
+            any(ord(char) <= 32 or ord(char) == 127 for char in value)):
+        raise ValueError('Bookmark must be a valid HTTP(S) URL of at most 4096 characters')
+    try:
+        parsed = urlsplit(value)
+        valid = (parsed.scheme in ('http', 'https') and bool(parsed.hostname) and
+                 parsed.username is None and parsed.password is None)
+        # Access port to reject malformed ports before persisting them.
+        _ = parsed.port
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError('Bookmark requires an absolute HTTP(S) URL without credentials')
+
+
 class CreateNote(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
+    kind: Literal['note', 'link'] = 'note'
     title: str = Field(default='', max_length=240)
     content: str = Field(min_length=1, max_length=100000)
 
@@ -26,6 +46,12 @@ class CreateNote(BaseModel):
         if not value.strip():
             raise ValueError('Empty note')
         return value
+
+    @model_validator(mode='after')
+    def validate_kind(self):
+        if self.kind == 'link':
+            require_http_bookmark(self.content)
+        return self
 
 
 class EditNote(BaseModel):
@@ -84,7 +110,11 @@ async def publish(conn, owner, row, operation):
 async def create_note(body: CreateNote, request: Request,
                       idempotency_key: UUID = Header(), who=Depends(principal)):
     owner = who[0]
-    request_hash = hashlib.sha256(json.dumps(body.model_dump(), sort_keys=True, ensure_ascii=False,
+    hash_payload = body.model_dump()
+    # Preserve S2 retry fingerprints for existing note clients across upgrade.
+    if body.kind == 'note':
+        hash_payload.pop('kind')
+    request_hash = hashlib.sha256(json.dumps(hash_payload, sort_keys=True, ensure_ascii=False,
                                            separators=(',', ':')).encode()).hexdigest()
     async with writing(request, who) as conn:
         previous = await conn.fetchrow("SELECT *, expires_at>clock_timestamp() AS usable FROM idempotency_keys WHERE key=$1 AND route='/v1/memories'", idempotency_key)
@@ -100,8 +130,8 @@ async def create_note(body: CreateNote, request: Request,
             return json.loads(snapshot)
         # created_sequence is the value publish() will commit under the same row lock.
         next_seq = await conn.fetchval('SELECT sync_sequence+1 FROM users WHERE id=$1', owner)
-        row = await conn.fetchrow('''INSERT INTO memories(id,owner_id,title,user_note,created_sequence)
-            VALUES($1,$2,$3,$4,$5) RETURNING *''', uuid4(), owner, body.title, body.content, next_seq)
+        row = await conn.fetchrow('''INSERT INTO memories(id,owner_id,kind,title,user_note,created_sequence)
+            VALUES($1,$2,$3,$4,$5,$6) RETURNING *''', uuid4(), owner, body.kind, body.title, body.content, next_seq)
         await publish(conn, owner, row, 'upsert')
         await conn.execute('''INSERT INTO idempotency_keys(owner_id,key,route,request_hash,response_status,response_entity_id,expires_at)
             VALUES($1,$2,'/v1/memories',$3,201,$4,clock_timestamp()+interval '24 hours')''',
@@ -112,7 +142,7 @@ async def create_note(body: CreateNote, request: Request,
 @router.get('/memories')
 async def list_notes(request: Request, cursor: str | None = Query(default=None, max_length=4096),
                      limit: int = Query(default=20, ge=1, le=50), archived: bool = False,
-                     who=Depends(principal)):
+                     starred: bool | None = None, who=Depends(principal)):
     owner = who[0]
     async with owned(request.app.state.pool, owner, isolation='repeatable_read', readonly=True) as conn:
         user = await conn.fetchrow('SELECT sync_sequence,sync_epoch FROM users WHERE id=$1', owner)
@@ -121,7 +151,8 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
         if cursor:
             state = decode(request.app.state.settings, cursor, owner, user['sync_epoch'], 'list')
             try:
-                if state['archived'] != archived or type(state['high']) is not int or not 0 <= state['high'] <= high:
+                if (state['archived'] != archived or state.get('starred') != starred
+                        or type(state['high']) is not int or not 0 <= state['high'] <= high):
                     raise ValueError()
                 high = state['high']
                 before_time, before_id = datetime.fromisoformat(state['before_time']), UUID(state['before_id'])
@@ -130,17 +161,35 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
             except (KeyError, TypeError, ValueError):
                 raise Problem(400, 'invalid_cursor') from None
         rows = await conn.fetch(f'''SELECT {summary_columns()} FROM memories WHERE owner_id=$1 AND deleted_at IS NULL
-            AND archived=$2 AND created_sequence<=$3
-            AND ($4::timestamptz IS NULL OR (created_at,id)<($4,$5::uuid))
-            ORDER BY created_at DESC,id DESC LIMIT $6''', owner, archived, high, before_time, before_id, limit+1)
+            AND archived=$2 AND ($3::boolean IS NULL OR starred=$3) AND created_sequence<=$4
+            AND ($5::timestamptz IS NULL OR (created_at,id)<($5,$6::uuid))
+            ORDER BY created_at DESC,id DESC LIMIT $7''', owner, archived, starred, high, before_time, before_id, limit+1)
         page = rows[:limit]
         next_cursor = None
         if len(rows) > limit:
             last = page[-1]
             next_cursor = encode(request.app.state.settings, owner, user['sync_epoch'], 'list',
-                                 high=high, archived=archived, before_time=last['created_at'].isoformat(), before_id=str(last['id']))
+                                 high=high, archived=archived, starred=starred,
+                                 before_time=last['created_at'].isoformat(), before_id=str(last['id']))
         return {'items': [memory(row, detail=False) for row in page], 'next_cursor': next_cursor,
                 'sync_cursor': encode(request.app.state.settings, owner, user['sync_epoch'], 'sync', after=high)}
+
+
+@router.get('/search')
+async def search_memories(request: Request, q: str = Query(min_length=1, max_length=160),
+                          limit: int = Query(default=20, ge=1, le=50), who=Depends(principal)):
+    """Owner-scoped literal keyword search; not embeddings or semantic inference."""
+    query = q.strip()
+    if not query:
+        raise Problem(422, 'invalid_search_query')
+    async with owned(request.app.state.pool, who[0], isolation='repeatable_read', readonly=True) as conn:
+        rows = await conn.fetch(f'''SELECT {summary_columns()} FROM memories
+            WHERE owner_id=$1 AND deleted_at IS NULL
+            AND (strpos(lower(title), lower($2))>0
+                 OR strpos(lower(user_note), lower($2))>0)
+            ORDER BY created_at DESC,id DESC LIMIT $3''', who[0], query, limit+1)
+    return {'items': [memory(row, detail=False) for row in rows[:limit]],
+            'has_more': len(rows) > limit}
 
 
 @router.get('/memories/{memory_id}')
@@ -163,6 +212,11 @@ async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depen
         values = dict(row)
         for field in body.model_fields_set - {'expected_version'}:
             values['user_note' if field == 'content' else field] = getattr(body, field)
+        if row['kind'] == 'link':
+            try:
+                require_http_bookmark(values['user_note'])
+            except ValueError:
+                raise Problem(422, 'invalid_request') from None
         if all(values[k] == row[k] for k in ('title', 'user_note', 'starred', 'archived')):
             return memory(row)
         updated = await conn.fetchrow('''UPDATE memories SET title=$1,user_note=$2,starred=$3,archived=$4,

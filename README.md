@@ -6,7 +6,7 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
 
-> **Project status:** Working experimental extractor and benchmark lab (v0.3). This is not a production-ready public scraping service. The planned RecallBox personal-memory app is **not implemented in this repository**.
+> **Project status:** Working experimental extractor and benchmark lab (v0.3). This is not a production-ready public scraping service. A separate RecallBox mobile/API prototype is present but **not accepted as a working or publicly deployed beta**.
 
 ## Why this exists
 
@@ -23,13 +23,13 @@ Universal URL Extractor aims to make this work **modular, measurable, and transp
 
 | | Universal URL Extractor | RecallBox |
 |---|---|---|
-| **What it is** | Reusable developer infrastructure | Planned personal digital-memory application |
-| **Status** | Working experimental implementation in this repo | Product vision / future implementation |
+| **What it is** | Reusable developer infrastructure | Private native personal-memory application (prototype) |
+| **Status** | Working experimental implementation in this repo | Source implemented for authentication, owned notes and draft link bookmarks and manual Collections; real-device acceptance pending |
 | **Focus** | URL extraction, normalized output, engine benchmarking | Save, rediscover, and eventually act on personal saved content |
 | **Typical user** | Developers, researchers, knowledge-system builders | People saving links, articles, screenshots, and notes |
-| **Boundary** | Does **not** provide semantic search, user accounts, or a consumer UI | Would consume the extractor as one ingestion component |
+| **Boundary** | Does **not** provide semantic search, user accounts, or a consumer UI | Separate FastAPI/Expo stack; not yet connected to extractor workers |
 
-**RecallBox is a proposed downstream use case**, not a claim about features shipped here. Read [the RecallBox vision](docs/RECALLBOX_VISION.md).
+**RecallBox is separate from the extractor**: its local-only API/mobile source is in this repository, but there is no completed public release or verified production experience. Read [the RecallBox vision](docs/RECALLBOX_VISION.md).
 
 ## What works in v0.3
 
@@ -46,7 +46,7 @@ Universal URL Extractor aims to make this work **modular, measurable, and transp
 - Manual/blinded evaluation workflow and optional, explicitly enabled OpenAI API scoring.
 - Evidence-gated scores, category leaderboards, data exports, and comparison tools.
 
-**Not shipped:** guaranteed social/video understanding, audio transcription, image OCR, RecallBox UI, embeddings/semantic search, a trained ML router, a verified 1,000-URL benchmark corpus, or production-grade multi-tenant hosting.
+**Not shipped or verified:** guaranteed social/video understanding, audio transcription, image OCR, a released RecallBox app, embeddings/semantic search, a trained ML router, a verified 1,000-URL benchmark corpus, or production-grade multi-tenant hosting.
 
 ## Quick start
 
@@ -132,8 +132,9 @@ Universal URL Extractor
             |-- human-verified references / optional AI review
             +-- evidence-gated scores and reports
 
-Future, separate application:
-RecallBox ingestion -> personal library -> semantic retrieval -> user actions
+Separate current prototype:
+RecallBox native UI -> private notes / saved links -> literal keyword retrieval
+Later (not implemented): URL ingestion workers -> semantic retrieval -> user actions
           ^
           | may use Universal URL Extractor
 ```
@@ -156,7 +157,7 @@ The extractor is intended to remain usable independently of RecallBox.
 - [Benchmark Lab](benchmarks/README.md) — evaluation, datasets, review process, and scoring
 - [Architecture](docs/PROJECT_ARCHITECTURE.md) · [Diagrams](docs/ARCHITECTURE_DIAGRAMS.md) · [Database schema](docs/DATABASE_SCHEMA.md)
 - [Roadmap](ROADMAP.md) — current state, next milestones, and deferred ideas
-- [RecallBox vision](docs/RECALLBOX_VISION.md) — future consumer app, clearly separate from this toolkit
+- [RecallBox vision](docs/RECALLBOX_VISION.md) — product direction distinct from this extractor
 - [Contributing](CONTRIBUTING.md) — contribution process and lightweight local verification
 
 ## Contributing
@@ -172,9 +173,8 @@ The repository is newly public; no community adoption, benchmark results, or pro
 ## RecallBox product implementation
 
 The separate local-only S1 product API and Expo mobile project are documented in
-[the S1 implementation guide](docs/RECALLBOX_S1_IMPLEMENTATION.md). Live S1
-acceptance remains blocked on PostgreSQL/pgvector, identity-provider setup and
-both-platform device verification. The extractor and private benchmark laboratory
+[the S1 implementation guide](docs/RECALLBOX_S1_IMPLEMENTATION.md). The local PostgreSQL/pgvector schema and Auth0 configuration were provisioned
+on 7 November, but **real account/device login acceptance remains blocked**. The extractor and private benchmark laboratory
 retain their existing entry points and SQLite storage.
 
 S2 adds private plain-text notes, versioned edits, durable create retries and a
@@ -182,3 +182,9 @@ cursor-based mobile Inbox/sync client. See the
 [S2 implementation and verification guide](docs/RECALLBOX_S2_IMPLEMENTATION.md)
 and [API contract](docs/RECALLBOX_S2_API.md). Real database/provider/device acceptance
 remains blocked; no public deployment is configured.
+
+The draft Sunday MVP branch additionally implements saved HTTP(S) bookmarks, manual Collections and
+owner-scoped **literal keyword search** (not semantic search). It requires additive
+migrations through `0004_collections` and Android/operator acceptance before any merge
+or beta declaration. See [Sunday manual handoff](docs/RECALLBOX_SUNDAY_MVP_HANDOFF.md)
+and [draft PR #3](https://github.com/sattavatakshat/RecallBox/pull/3).

@@ -15,6 +15,7 @@ from .config import Settings
 from .db import connect, owned
 from .identity import IdentityRejected, IdentityVerifier
 from .memories import router as memory_router
+from .collections import router as collection_router
 from .problems import Problem
 from .sync import router as sync_router
 
@@ -178,5 +179,6 @@ def create_app():
         return dict(row)
 
     app.include_router(memory_router)
+    app.include_router(collection_router)
     app.include_router(sync_router)
     return app

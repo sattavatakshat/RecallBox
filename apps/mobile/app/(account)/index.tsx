@@ -21,29 +21,45 @@ export default function Inbox() {
   }
   return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}>
     <FlatList data={store.items} keyExtractor={note => note.id}
-      contentContainerStyle={{padding: 28, gap: 20, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
+      contentContainerStyle={{padding: tokens.space.large, gap: 12, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
       ListHeaderComponent={<View style={{gap: 20}}>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
-          <Type>RECALLBOX</Type><TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
+          <Type>RECALLBOX</Type><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
+          <TextAction label="Search" onPress={() => router.push('/(account)/search')}/>
+          <TextAction label="Collections" onPress={() => router.push('/(account)/collections')}/>
+          <TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
         </View>
-        <Type title>{store.archived ? 'Tucked away.' : 'Your little library.'}</Type>
-        <Type muted>{store.archived ? 'Notes you’ve put aside, still here when you need them.' : 'A thought, a detail, a little thing worth keeping.'}</Type>
-        <Button label="Write a note" onPress={() => router.push('/(account)/new')}/>
-        <TextAction label={store.archived ? 'Return to inbox' : 'Open archive'} disabled={store.loading}
-          onPress={() => void store.refresh(!store.archived).catch(() => undefined)}/>
+        </View>
+        <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
+        <Type muted>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : 'A little space for what you want to remember.'}</Type>
+        <Pressable accessibilityRole="button" accessibilityLabel="Find something you saved"
+          onPress={() => router.push('/(account)/search')}
+          style={({pressed}) => ({minHeight: 56, paddingHorizontal: 18, paddingVertical: 16,
+            borderRadius: tokens.radius, borderWidth: 1, borderColor: p.line,
+            backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
+          <Type muted>Find something you saved…</Type>
+        </Pressable>
+        <Button label="Save something" onPress={() => router.push('/(account)/save')}/>
+        <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
+          <TextAction label={store.starredOnly ? 'All saved' : 'Starred only'} disabled={store.loading}
+            onPress={() => void store.refresh(store.archived, !store.starredOnly).catch(() => undefined)}/>
+          <TextAction label={store.archived ? 'Return to library' : 'Open archive'} disabled={store.loading}
+            onPress={() => void store.refresh(!store.archived, store.starredOnly).catch(() => undefined)}/>
+        </View>
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
       ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
-        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.archived ? 'Nothing tucked away.' : 'Begin with one thought.'}</Type>
-          <Type muted>{store.archived ? 'Archived notes will appear here.' : 'Write your first note. It will be saved privately to your account.'}</Type>
+        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.starredOnly ? 'No starred memories yet.' : (store.archived ? 'Nothing tucked away.' : 'Your first saved thing.')}</Type>
+          <Type muted>{store.starredOnly ? 'Star a saved note or link to keep it close.' : (store.archived ? 'Archived notes and links will appear here.' : 'Save a useful link or write a thought. It will stay in your private library.')}</Type>
           {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
-      renderItem={({item}) => <View style={{borderWidth: 1, borderColor: p.line, borderRadius: tokens.radius, padding: 20, gap: 12}}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || 'Untitled note'}`}
+      renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}`}
           style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
-          <Type>{item.starred ? '★  ' : ''}{item.title || 'Untitled note'}</Type>
+          <Type>{item.starred ? '★  ' : ''}{item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}</Type>
           <Type muted>{item.preview}</Type>
+          <Type muted>{item.kind === 'link' ? 'SAVED LINK' : 'NOTE'}</Type>
           <Type muted>{new Date(item.created_at).toLocaleDateString()}</Type>
         </Pressable>
         <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
