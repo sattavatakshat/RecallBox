@@ -24,12 +24,9 @@ export default function Inbox() {
       contentContainerStyle={{padding: tokens.space.large, gap: 12, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
       ListHeaderComponent={<View style={{gap: 20}}>
-        <View style={{flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'}}>
-          <Type>RECALLBOX</Type><View style={{flexDirection: 'row', flexWrap: 'wrap'}}>
-          <TextAction label="Search" onPress={() => router.push('/(account)/search')}/>
-          <TextAction label="Collections" onPress={() => router.push('/(account)/collections')}/>
-          <TextAction label="Account" onPress={() => router.push('/(account)/account')}/>
-        </View>
+        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+          <Type variant="label" style={{letterSpacing: 1.4}}>RECALLBOX</Type>
+          <TextAction label="Profile" onPress={() => router.push('/(account)/account')}/>
         </View>
         <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
         <Type muted>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : 'A little space for what you want to remember.'}</Type>
