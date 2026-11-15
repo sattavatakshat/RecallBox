@@ -51,6 +51,7 @@ export default function Inbox() {
           <TextAction label={store.archived ? 'Return to library' : 'Open archive'} disabled={store.loading}
             onPress={() => void store.refresh(!store.archived, store.starredOnly).catch(() => undefined)}/>
         </View>}
+        {store.items.length > 0 && <TextAction label="Recently captured" onPress={() => router.push('/(account)/captured')}/>}
         {store.items.length > 0 && <Type variant="section">{store.archived ? 'Archived' : store.starredOnly ? 'Starred' : 'Recently saved'}</Type>}
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
@@ -72,7 +73,8 @@ export default function Inbox() {
                 <Button label="Back to all memories" variant="secondary"
                   onPress={() => void store.refresh(false, false).catch(() => undefined)}/>
               </View>
-            : <EmptyLibrary onSave={() => router.push('/(account)/save')}/>}
+            : <EmptyLibrary onSave={() => router.push('/(account)/save')}
+                onCaptured={() => router.push('/(account)/captured')}/>}
       renderItem={({item}) => <MemoryCard
         memory={item} busy={Boolean(working)}
         onOpen={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
