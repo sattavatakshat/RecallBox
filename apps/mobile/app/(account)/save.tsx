@@ -1,5 +1,5 @@
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Pressable, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import {Type, tokens, usePalette} from '../../src/ui';
@@ -24,7 +24,7 @@ export default function SaveSomething() {
   const p = usePalette();
   return <View style={{flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.36)'}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close save options"
-      onPress={() => router.back()} style={StyleSheet.absoluteFillObject}/>
+      onPress={() => router.back()} style={{position: 'absolute', top: 0, right: 0, bottom: 0, left: 0}}/>
     <SafeAreaView edges={['bottom']} style={{
       backgroundColor: p.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
       overflow: 'hidden', width: '100%', maxWidth: 540, alignSelf: 'center',
