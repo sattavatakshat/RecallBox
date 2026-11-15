@@ -1,6 +1,10 @@
 name: RecallBox MVP static validation
 
 on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
   pull_request:
     paths:
       - 'apps/mobile/**'
