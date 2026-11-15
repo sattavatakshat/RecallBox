@@ -1,0 +1,47 @@
+name: RecallBox MVP static validation
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'src/recallbox/**'
+      - 'migrations/**'
+      - 'scripts/recallbox_local_preflight.py'
+      - '.github/workflows/recallbox-mvp-static.yml'
+permissions:
+  contents: read
+
+concurrency:
+  group: recallbox-mvp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile product Python source (no runtime or DB required)
+        run: python -m compileall -q src/recallbox migrations/versions scripts/recallbox_local_preflight.py
+
+  mobile-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install exact locked development dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Type-check React Native / Expo
+        run: npm run typecheck
+
+# This is compile/type validation only. It does not run tests, migrate a
+# database, verify Auth0 login, build an APK or replace native-device QA.

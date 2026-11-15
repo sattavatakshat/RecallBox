@@ -6,5 +6,5 @@ export default function Welcome() {
   const session = useSession();
   if (session.loading) return <Screen><Notice>Opening your space…</Notice></Screen>;
   if (session.account) return <Redirect href="/(account)"/>;
-  return <Screen><Type>RECALLBOX / A LITTLE SPACE FOR YOU</Type><View style={{height: 48}}/><Type title>Keep a little.{ '\n' }Find it again.</Type><Type muted>A personal place for the things you want to remember. Your account is the first page.</Type><View style={{flex: 1, minHeight: 48}}/><Notice>{session.message}</Notice><Button label="Make yourself at home" onPress={() => router.push('/sign-in')}/><Type muted>Your identity provider handles sign-in. Your RecallBox session stays in your device’s secure storage.</Type></Screen>;
+  return <Screen><Type>RECALLBOX</Type><View style={{height: 48}}/><Type title>A home for what you save.</Type><Type muted>A quiet place for details worth keeping. Start with a note and find it again whenever you need it.</Type><View style={{flex: 1, minHeight: 48}}/>{!!session.message && <Notice>{session.message}</Notice>}<Button label="Continue securely" onPress={() => router.push('/sign-in')}/><Type muted>Sign-in happens in your browser. Your session credential is kept in this device’s secure storage.</Type></Screen>;
 }
