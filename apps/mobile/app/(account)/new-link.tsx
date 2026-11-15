@@ -1,14 +1,15 @@
 import React, {useRef, useState} from 'react';
-import {Alert} from 'react-native';
+import {Alert, View} from 'react-native';
 import {router, usePreventRemove} from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import {ApiError, memoriesApi} from '../../src/api';
 import {useSession} from '../../src/session';
 import {errorMessage} from '../../src/memories';
-import {Button, Input, Notice, Screen, TextAction, Type} from '../../src/ui';
+import {Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
 export default function NewLink() {
   const {authorized} = useSession();
+  const palette = usePalette();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -59,14 +60,14 @@ export default function NewLink() {
   }
 
   return <Screen compact>
-    <TextAction label="Back" onPress={() => router.back()}/>
-    <Type variant="eyebrow" muted>ONE LINK TO KEEP</Type>
+    <View style={{alignItems: 'center', marginBottom: 12}}><View style={{width: 38, height: 4, borderRadius: 8, backgroundColor: palette.line}} /></View>
+    <TextAction label="Close link composer" onPress={() => router.back()}/>
     <Type variant="section">Save a link.</Type>
-    <Type muted>Paste it here. RecallBox will save the source and check which details are available.</Type>
+    <Type muted>Paste a public link; details can be processed later.</Type>
     <Input label="Link" value={url} onChangeText={setUrl} keyboardType="url"
       autoFocus={!locked} autoCapitalize="none" autoCorrect={false}
       maxLength={4096} editable={!busy && !locked}
-      placeholder="https://example.com/article"/>
+      placeholder="https://..."/>
     {!!error && <Notice kind="error">{error}</Notice>}
     {locked && !busy && <Notice>
       Save not confirmed. Retry keeps the same URL and save key to avoid duplicates.
