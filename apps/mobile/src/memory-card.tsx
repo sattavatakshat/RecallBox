@@ -45,7 +45,6 @@ export function MemoryCard({memory, onOpen, onStar, busy = false}: {
   busy?: boolean;
 }) {
   const p = usePalette();
-  const label = kindLabel(memory);
   const meta = [kindLabel(memory), sourceName(memory)].filter(Boolean).join(' · ');
   const detail = [shortDate(memory.created_at), memory.collection].filter(Boolean).join(' · ');
   return <View style={{flexDirection: 'row', alignItems: 'center', gap: 12,
