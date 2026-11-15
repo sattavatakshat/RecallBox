@@ -43,14 +43,23 @@ export default function NewNote() {
       }
     } finally { setBusy(false); }
   }
-  return <Screen>
-    <TextAction label="Back to inbox" onPress={() => router.back()}/>
-    <Type>ONE THING TO KEEP</Type><Type title>A new note.</Type>
-    <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!locked && !busy} placeholder="Give it a name (optional)"/>
-    <Input label="Note" value={content} onChangeText={setContent} maxLength={100000} multiline
-      textAlignVertical="top" style={{minHeight: 240}} editable={!locked && !busy} placeholder="What would you like to remember?"/>
-    {!!error && <Notice>{error}</Notice>}
-    {locked && !busy && <Notice>The save is not confirmed. Retry sends the same draft with the same save key.</Notice>}
-    <Button label={locked ? 'Retry this save' : 'Save to RecallBox'} busy={busy} disabled={!content.trim()} onPress={() => void save()}/>
+  return <Screen compact>
+    <TextAction label="Back" onPress={() => router.back()}/>
+    <Type variant="eyebrow" muted>QUICK NOTE</Type>
+    <Type variant="section">Keep a thought.</Type>
+    <Type muted>Capture it now. Give it a name later if you like.</Type>
+    <Input label="Title (optional)" value={title} onChangeText={setTitle}
+      maxLength={240} editable={!locked && !busy} placeholder="A name for this thought"/>
+    <Input label="Your note" value={content} onChangeText={setContent}
+      maxLength={100000} multiline autoFocus={!locked}
+      textAlignVertical="top" style={{minHeight: 250}} editable={!locked && !busy}
+      placeholder="What do you want to remember?"/>
+    {!!error && <Notice kind="error">{error}</Notice>}
+    {locked && !busy && <Notice>
+      The save isn't confirmed. Retry uses the same request so it won't create a duplicate.
+    </Notice>}
+    <Button label={locked ? 'Retry this save' : 'Save note'} busy={busy}
+      disabled={!content.trim()} onPress={() => void save()}/>
+    <Type muted variant="caption">No category or collection needed.</Type>
   </Screen>;
 }
