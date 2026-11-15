@@ -21,7 +21,13 @@ export default function Protected() {
 
   return <MemoryProvider key={account.id}>
     <View style={{flex: 1, backgroundColor: p.paper}}>
-      <Stack screenOptions={{headerShown: false}}/>
+      <Stack screenOptions={{headerShown: false}}>
+        <Stack.Screen name="save" options={{
+          presentation: 'transparentModal',
+          animation: 'slide_from_bottom',
+          contentStyle: {backgroundColor: 'transparent'},
+        }}/>
+      </Stack>
       {showTabs && <BottomNavigation active={isSearch ? 'search' : isCollections ? 'collections' : 'library'}/>}
     </View>
   </MemoryProvider>;
