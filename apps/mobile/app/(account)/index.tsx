@@ -37,13 +37,13 @@ export default function Inbox() {
           <TextAction label="Profile" onPress={() => router.push('/(account)/account')}/>
         </View>
         <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
-        <Type muted style={{fontSize: 14, lineHeight: 22}}>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : 'Everything you wanted to remember, in one place.'}</Type>
+        <Type muted style={{fontSize: 14, lineHeight: 22}}>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : store.items.length > 0 ? 'The things worth remembering.' : 'Everything you wanted to remember, in one place.'}</Type>
         <Pressable accessibilityRole="button" accessibilityLabel="Find something you saved"
           onPress={() => router.push('/(account)/search')}
           style={({pressed}) => ({minHeight: 56, paddingHorizontal: 18, paddingVertical: 16,
             borderRadius: tokens.radius, borderWidth: 1, borderColor: p.line,
             backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
-          <Type muted style={{fontSize: 13}}>⌕  Find something you saved...</Type>
+          <Type muted style={{fontSize: 13}}>⌕  {store.items.length > 0 ? 'Find that thing you saved...' : 'Find something you saved...'}</Type>
         </Pressable>
         {(store.items.length > 0 || store.starredOnly || store.archived) && <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
           <TextAction label={store.starredOnly ? 'All saved' : 'Starred only'} disabled={store.loading}
@@ -51,6 +51,7 @@ export default function Inbox() {
           <TextAction label={store.archived ? 'Return to library' : 'Open archive'} disabled={store.loading}
             onPress={() => void store.refresh(!store.archived, store.starredOnly).catch(() => undefined)}/>
         </View>}
+        {store.items.length > 0 && <Type variant="section">{store.archived ? 'Archived' : store.starredOnly ? 'Starred' : 'Recently saved'}</Type>}
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
