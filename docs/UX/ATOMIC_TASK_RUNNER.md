@@ -1,6 +1,6 @@
 # RecallBox — atomic UX task runner (proposed)
 
-**State:** Queue prepared; no unattended Codex Cloud execution has been activated.
+**State:** ChatGPT hourly automation is ENABLED (task ID `6af9fed59c8081918d51fbab5d2790ba`, Asia/Kolkata). It orchestrates one queue iteration per run. A direct Codex Cloud launcher is still not exposed; never claim Codex Cloud execution unless observed.
 **Queue (editable):** https://docs.google.com/spreadsheets/d/15QBYgQifpm1PgiX6pl2Gap19kq6C6eC2U3Lq115Clk8/edit
 **Design baseline:** [Final UX blueprint](RECALLBOX_FINAL_UX_BLUEPRINT_V1.md) and [interactive prototype](RecallBox_Interactive_Prototype.html).
 **Repo:** `sattavatakshat/RecallBox`, latest `main`.
@@ -51,11 +51,11 @@ Do not change auth, migrations, network worker, data model, or unrelated screens
 
 ## Scheduling and cost reality
 
-ChatGPT's built-in task scheduler supports at most **hourly** recurring runs. It has not been configured for this request, because the requested **30-minute** frequency is unsupported.
+ChatGPT's built-in task scheduler supports at most **hourly** recurring runs. The user accepted hourly frequency and the **RecallBox Hourly UX Build** automation is enabled. The first scheduled run reported was **2026-11-16 01:19:57 IST**. Each later iteration must inspect the live Sheet and GitHub; do not infer that a scheduled task successfully edited code.
 
 GitHub Actions supports a 30-minute cron (not guaranteed to start exactly on time). The official `openai/codex-action@v1` is a **Responses API-key** integration with separate API billing; it does not consume ChatGPT subscription Codex Cloud credits. There is no Codex Cloud task-launch tool exposed in this chat. **Do not silently enable an API-paid alternative.**
 
-To complete unattended execution, an operator must select an execution surface, provide the necessary authenticated Codex Cloud environment or opt into the separate API-key workflow, and confirm the automation can read/write the Google Sheet and repository. Until then this is a ready queue, not an active code-building scheduler.
+To complete unattended execution, an operator must select an execution surface, provide the necessary authenticated Codex Cloud environment or opt into the separate API-key workflow, and confirm the automation can read/write the Google Sheet and repository. The hourly orchestration is active, but that does not guarantee Codex Cloud code execution or successful merges. Without an authorized launcher, a run may use available connected GitHub tools for a narrowly scoped patch, or report BLOCKED; no paid API alternative is enabled.
 
 ## Morning verification
 
