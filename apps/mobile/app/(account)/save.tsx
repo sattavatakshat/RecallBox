@@ -5,15 +5,15 @@ import {router} from 'expo-router';
 import {Type, tokens, usePalette} from '../../src/ui';
 
 type CaptureOption = {
-  key: string; title: string; subtitle: string; route:
+  key: string; icon: string; title: string; subtitle: string; route:
     '/(account)/new-link' | '/(account)/new' | '/(account)/capture';
 };
 
 const options: CaptureOption[] = [
-  {key: 'URL', title: 'Paste a link', subtitle: 'Articles, websites and saved links', route: '/(account)/new-link'},
-  {key: 'NOTE', title: 'Write a note', subtitle: 'A thought or something to remember', route: '/(account)/new'},
-  {key: 'IMG', title: 'Photo or screenshot', subtitle: 'Choose a saved image or use the camera', route: '/(account)/capture'},
-  {key: 'PDF', title: 'Add a PDF', subtitle: 'Choose a document from your files', route: '/(account)/capture'},
+  {key: 'URL', icon: '↗', title: 'Paste a link', subtitle: 'Articles, websites and saved links', route: '/(account)/new-link'},
+  {key: 'NOTE', icon: '✎', title: 'Write a note', subtitle: 'A thought or something to remember', route: '/(account)/new'},
+  {key: 'IMG', icon: '▧', title: 'Photo or screenshot', subtitle: 'Choose a saved image or use the camera', route: '/(account)/capture'},
+  {key: 'PDF', icon: '▤', title: 'PDF', subtitle: 'Choose a document from your files', route: '/(account)/capture'},
 ];
 
 /**
@@ -65,8 +65,8 @@ export default function SaveSomething() {
             width: 48, height: 48, borderRadius: tokens.radii.small,
             backgroundColor: p.surfaceMuted, alignItems: 'center', justifyContent: 'center',
           }}>
-            <Text style={{color: p.accent, fontWeight: '700', fontSize: 11, letterSpacing: 0.5}}>
-              {item.key}
+            <Text style={{color: p.accent, fontWeight: '700', fontSize: 24}}>
+              {item.icon}
             </Text>
           </View>
           <View style={{flex: 1, gap: 2}}>
@@ -75,6 +75,7 @@ export default function SaveSomething() {
           </View>
           <Text style={{color: p.muted, fontSize: 20}}>›</Text>
         </Pressable>)}
+        <View accessibilityLabel="Video capture is not available yet" style={{minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: tokens.space.medium, paddingHorizontal: tokens.space.compact, opacity: 0.6}}><View style={{width: 48, height: 48, borderRadius: tokens.radii.small, backgroundColor: p.surfaceMuted, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: p.accent, fontSize: 24}}>▷</Text></View><View style={{flex: 1, gap: 2}}><Type variant="label">Video</Type><Type muted variant="caption">Not available yet — video uploads are unsupported</Type></View></View>
         <Type variant="caption" muted style={{textAlign: 'center', marginTop: tokens.space.small}}>
           Files and links are saved privately to your account.
         </Type>
