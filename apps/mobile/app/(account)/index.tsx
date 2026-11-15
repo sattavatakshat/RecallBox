@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { MemorySummary } from '../../src/api';
 import { errorMessage, useMemories } from '../../src/memories';
 import { Button, Notice, TextAction, Type, tokens, usePalette } from '../../src/ui';
+import { EmptyLibrary } from '../../src/empty-library';
 
 export default function Inbox() {
   const store = useMemories();
@@ -37,7 +38,8 @@ export default function Inbox() {
             backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
           <Type muted>Find something you saved…</Type>
         </Pressable>
-        <Button label="Save something" onPress={() => router.push('/(account)/save')}/>
+        {store.items.length > 0 && !store.archived && !store.starredOnly &&
+          <Button label="Save something" onPress={() => router.push('/(account)/save')}/>}
         <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
           <TextAction label={store.starredOnly ? 'All saved' : 'Starred only'} disabled={store.loading}
             onPress={() => void store.refresh(store.archived, !store.starredOnly).catch(() => undefined)}/>
@@ -47,10 +49,24 @@ export default function Inbox() {
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
-      ListEmptyComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading notes" color={p.ink}/> :
-        <View style={{paddingVertical: 32, gap: 12}}><Type title>{store.starredOnly ? 'No starred memories yet.' : (store.archived ? 'Nothing tucked away.' : 'Your first saved thing.')}</Type>
-          <Type muted>{store.starredOnly ? 'Star a saved note or link to keep it close.' : (store.archived ? 'Archived notes and links will appear here.' : 'Save a useful link or write a thought. It will stay in your private library.')}</Type>
-          {!!store.error && <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>}</View>}
+      ListEmptyComponent={store.loading
+        ? <ActivityIndicator accessibilityLabel="Loading your memories" color={p.ink}/>
+        : store.error
+          ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
+              <Type variant="section">Your library couldn't load.</Type>
+              <Type muted>Check your connection and try again. Your existing saves haven't been deleted.</Type>
+              <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>
+            </View>
+          : store.starredOnly || store.archived
+            ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
+                <Type variant="section">{store.starredOnly ? 'No starred memories yet.' : 'Nothing tucked away.'}</Type>
+                <Type muted>{store.starredOnly
+                  ? 'Star a memory to keep it close. Your other saves are still in the Library.'
+                  : 'Archived memories will show up here without leaving your account.'}</Type>
+                <Button label="Back to all memories" variant="secondary"
+                  onPress={() => void store.refresh(false, false).catch(() => undefined)}/>
+              </View>
+            : <EmptyLibrary onSave={() => router.push('/(account)/save')}/>}
       renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
         <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}`}
           style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
