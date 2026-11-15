@@ -39,7 +39,9 @@ Our product promise: **Save it once. Find it when it matters. Put it to use.** T
 | RB-18 | Export, account removal, purge, backup/restore | Product vision only | Planned | Complete per-user deletion and audited recovery |
 | RB-19 | Public HTTPS ingress, host operation, iOS parity | Mac hosting plan and Expo source only | Planned | Private invitation rollout, both-platform proof |
 
-**Static CI observed:** PR #3 head 4975c6c6ce349ad4f9f7a6f52ec6fbaec71a5b45 passed Python syntax and Expo TypeScript checks in GitHub Actions run 43692503937 on 2026-11-15. This does **not** prove migration, authentication, APK behaviour, access control or production readiness.
+**Static CI observed:** PR #3 head 4975c6c6ce349ad4f9f7a6f52ec6fbaec71a5b45 passed Python syntax and Expo TypeScript checks in run 43692503937. After merging, the main branch independently passed both checks in run 43692830761 on 2026-11-15. These checks do **not** prove migration, authentication, APK behaviour, access control or production readiness.
+
+**Active execution tracker:** Issue #4 — https://github.com/sattavatakshat/RecallBox/issues/4 — records the M0 real-device, database and account-isolation acceptance.
 
 ## Non-negotiable product and architectural decisions
 
