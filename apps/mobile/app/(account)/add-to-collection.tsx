@@ -49,10 +49,11 @@ export default function AddToCollection() {
     {!!error && <Notice>{error}</Notice>}
     {loading && <ActivityIndicator color={p.ink} accessibilityLabel="Loading collections"/>}
     {!loading && !error && !items.length && <Notice>No collections yet. Create one first, then return to this memory.</Notice>}
-    {!!error && items.length > 0 && <Notice>Showing previously loaded collections. Refresh before relying on this list.</Notice>}
+    {!!error && items.length > 0 && <Notice>Previously loaded collections are shown, but adding is paused until a successful refresh.</Notice>}
+    {!!error && <Button label="Retry loading collections" variant="secondary" disabled={loading || Boolean(working)} onPress={() => void refresh()}/>
     <View style={{gap: 10}}>
       {items.map(item => <Button key={item.id} label={`Add to ${item.name}`}
-        variant="secondary" busy={working === item.id} disabled={Boolean(working)}
+        variant="secondary" busy={working === item.id} disabled={Boolean(working) || loading || Boolean(error)}
         onPress={() => void add(item.id, item.name)}/>)}
     </View>
     <TextAction label="Create or manage collections"
