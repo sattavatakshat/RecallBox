@@ -24,7 +24,7 @@ function sourceName(memory: MemorySummary) {
   if (memory.kind === 'pdf') return 'PDF';
   const raw = memory.source_url || memory.preview;
   const match = /^https?:\/\/([^/?#]+)/i.exec(raw);
-  return match ? match[1].replace(/^www\./, '') : 'Saved link';
+  return match?.[1]?.replace(/^www\./, '') ?? 'Saved link';
 }
 
 function shortDate(iso: string) {
