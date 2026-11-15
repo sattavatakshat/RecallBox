@@ -1,42 +1,45 @@
 import React from 'react';
-import {View} from 'react-native';
-import {Button, Type, tokens, usePalette} from './ui';
+import {Pressable, Text, View} from 'react-native';
+import {Type, usePalette} from './ui';
 
-/** Empty Library is a real first-save entry point, not a fake sample feed. */
+/** RB-02: prototype empty-state hierarchy; no demo memories or simulated saves. */
 export function EmptyLibrary({onSave}: {onSave: () => void}) {
   const p = usePalette();
-  return <View style={{
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: tokens.space.section, paddingHorizontal: tokens.space.medium,
-    gap: tokens.space.compact,
-  }}>
-    <View importantForAccessibility="no-hide-descendants" style={{
-      width: 82, height: 82, borderRadius: 28,
-      backgroundColor: p.surfaceMuted, alignItems: 'center', justifyContent: 'center',
-      marginBottom: tokens.space.small,
+  return <View style={{gap: 16}}>
+    <View style={{minHeight: 260, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, gap: 10}}>
+      <View importantForAccessibility="no-hide-descendants" style={{
+        width: 82, height: 82, borderRadius: 25, backgroundColor: p.surfaceMuted,
+        alignItems: 'center', justifyContent: 'center', transform: [{rotate: '-6deg'}],
+      }}>
+        <View style={{width: 34, height: 43, borderColor: p.accent, borderWidth: 2,
+          borderTopLeftRadius: 4, borderTopRightRadius: 4, borderBottomWidth: 0}}/>
+        <View style={{position: 'absolute', bottom: 18, width: 24, height: 24,
+          borderColor: p.accent, borderTopWidth: 2, borderLeftWidth: 2,
+          transform: [{rotate: '45deg'}]}}/>
+      </View>
+      <Type style={{fontFamily: 'serif', fontSize: 27, lineHeight: 32, textAlign: 'center'}}>
+        Start with one thing.
+      </Type>
+      <Type muted style={{fontSize: 14, lineHeight: 22, textAlign: 'center'}}>
+        Paste an interesting link, write a thought or add a file. No folders required.
+      </Type>
+      <Pressable accessibilityRole="button" accessibilityLabel="Save something"
+        onPress={onSave} style={({pressed}) => ({
+          alignSelf: 'stretch', minHeight: 49, borderRadius: 13, backgroundColor: p.accent,
+          alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9,
+          opacity: pressed ? 0.75 : 1,
+        })}>
+        <Text style={{color: p.onAccent, fontSize: 19}}>＋</Text>
+        <Text style={{color: p.onAccent, fontSize: 14, fontWeight: '700'}}>Save something</Text>
+      </Pressable>
+    </View>
+    <View accessibilityLabel="Recently captured inbox is not yet available" style={{
+      minHeight: 49, borderRadius: 13, borderWidth: 1, borderColor: p.line,
+      backgroundColor: p.surface, paddingHorizontal: 12,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     }}>
-      <View style={{
-        width: 32, height: 40, borderRadius: 6,
-        borderWidth: 2, borderColor: p.accent,
-      }}/>
-      <View style={{
-        width: 12, height: 12, backgroundColor: p.surfaceMuted,
-        position: 'absolute', bottom: 21, left: 35,
-        borderLeftWidth: 2, borderTopWidth: 2, borderColor: p.accent,
-        transform: [{rotate: '45deg'}],
-      }}/>
+      <Text style={{color: p.ink, fontSize: 14}}>◷  Recently captured</Text>
+      <Text style={{color: p.muted, fontSize: 11}}>Not available yet</Text>
     </View>
-    <Type variant="section" style={{textAlign: 'center'}}>
-      A home for your discoveries.
-    </Type>
-    <Type muted style={{textAlign: 'center', maxWidth: 290}}>
-      Save a useful link, a thought or a photo. Find it here whenever you need it.
-    </Type>
-    <View style={{alignSelf: 'stretch', marginTop: tokens.space.medium}}>
-      <Button label="Save your first thing" onPress={onSave}/>
-    </View>
-    <Type muted variant="caption" style={{textAlign: 'center', marginTop: tokens.space.small}}>
-      No folders or tags required.
-    </Type>
   </View>;
 }
