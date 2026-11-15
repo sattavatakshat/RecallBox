@@ -6,6 +6,7 @@ import { MemorySummary } from '../../src/api';
 import { errorMessage, useMemories } from '../../src/memories';
 import { Button, Notice, TextAction, Type, tokens, usePalette } from '../../src/ui';
 import { EmptyLibrary } from '../../src/empty-library';
+import { MemoryCard } from '../../src/memory-card';
 
 export default function Inbox() {
   const store = useMemories();
@@ -38,8 +39,6 @@ export default function Inbox() {
             backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
           <Type muted>Find something you saved…</Type>
         </Pressable>
-        {store.items.length > 0 && !store.archived && !store.starredOnly &&
-          <Button label="Save something" onPress={() => router.push('/(account)/save')}/>}
         <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
           <TextAction label={store.starredOnly ? 'All saved' : 'Starred only'} disabled={store.loading}
             onPress={() => void store.refresh(store.archived, !store.starredOnly).catch(() => undefined)}/>
@@ -67,19 +66,10 @@ export default function Inbox() {
                   onPress={() => void store.refresh(false, false).catch(() => undefined)}/>
               </View>
             : <EmptyLibrary onSave={() => router.push('/(account)/save')}/>}
-      renderItem={({item}) => <View style={{borderBottomWidth: 1, borderColor: p.line, paddingVertical: 16, gap: 10}}>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}`}
-          style={{minHeight: 64, gap: 10}} onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
-          <Type>{item.starred ? '★  ' : ''}{item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}</Type>
-          <Type muted>{item.preview}</Type>
-          <Type muted>{item.kind.toUpperCase()} · {item.processing_state?.replace('_',' ')}{item.collection ? ` · ${item.collection}` : ''}</Type>
-          <Type muted>{new Date(item.created_at).toLocaleDateString()}</Type>
-        </Pressable>
-        <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
-          <TextAction label={item.starred ? 'Unstar' : 'Star'} disabled={Boolean(working)} onPress={() => void toggle(item, 'starred')}/>
-          <TextAction label={item.archived ? 'Move to inbox' : 'Archive'} disabled={Boolean(working)} onPress={() => void toggle(item, 'archived')}/>
-        </View>
-      </View>}
+      renderItem={({item}) => <MemoryCard
+        memory={item} busy={Boolean(working)}
+        onOpen={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
+        onStar={() => void toggle(item, 'starred')}/>}
       ListFooterComponent={store.hasMore ? <Button label="Load earlier notes" busy={store.loading}
         onPress={() => void store.more().catch(() => undefined)}/> : <View style={{height: 16}}/>}
     />
