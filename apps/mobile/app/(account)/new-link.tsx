@@ -1,72 +1,80 @@
-import React, { useRef, useState } from 'react';
-import { Alert } from 'react-native';
-import { router, usePreventRemove } from 'expo-router';
+import React, {useRef, useState} from 'react';
+import {Alert} from 'react-native';
+import {router, usePreventRemove} from 'expo-router';
 import * as Crypto from 'expo-crypto';
-import { ApiError } from '../../src/api';
-import { errorMessage, useMemories } from '../../src/memories';
-import { Button, Input, Notice, Screen, TextAction, Type } from '../../src/ui';
+import {ApiError, memoriesApi} from '../../src/api';
+import {useSession} from '../../src/session';
+import {errorMessage} from '../../src/memories';
+import {Button, Input, Notice, Screen, TextAction, Type} from '../../src/ui';
 
 export default function NewLink() {
-  const {create} = useMemories();
-  const [title, setTitle] = useState('');
+  const {authorized} = useSession();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState('');
   const [leaving, setLeaving] = useState(false);
-  const attempt = useRef<{key: string; title: string; url: string} | null>(null);
-  const release = usePreventRemove(Boolean(title || url) && !leaving, ({repeat}) => {
+  const attempt = useRef<{key: string; url: string} | null>(null);
+
+  const release = usePreventRemove(Boolean(url.trim()) && !leaving, ({repeat}) => {
     if (busy) {
-      Alert.alert('Save in progress', 'Wait for the save to finish before leaving.');
+      Alert.alert('Save in progress', 'Wait for the save request to finish.');
       return;
     }
-    Alert.alert('Leave this link?', locked
-      ? 'The save may have succeeded. Retry here with the same key, or check your library.'
-      : 'This link has not been saved. Leaving discards your draft.', [
+    Alert.alert(locked ? 'Save not confirmed' : 'Leave this link?', locked
+      ? 'This save may already have succeeded. Retry safely or check the Library first.'
+      : 'This link has not been saved. Leaving discards your entry.', [
       {text: 'Keep editing', style: 'cancel'},
-      {text: 'Leave', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
+      {text: 'Leave', style: 'destructive', onPress: () => {
+        setLeaving(true); release(); repeat();
+      }},
     ]);
   });
 
   async function save() {
     if (busy || !url.trim()) return;
     setBusy(true); setError('');
-    if (!attempt.current) {
-      attempt.current = {key: Crypto.randomUUID(), title, url: url.trim()};
-    }
+    if (!attempt.current) attempt.current = {key: Crypto.randomUUID(), url: url.trim()};
+    const request = attempt.current;
     setLocked(true);
     try {
-      const result = await create({
-        kind: 'link', title: attempt.current.title, content: attempt.current.url,
-      }, attempt.current.key);
+      // The secure capture API saves the URL durably and queues honest processing.
+      // The older note-style link API stored the URL without extraction.
+      const saved = await authorized(access => memoriesApi.capture(access, request.url, request.key));
       setLeaving(true);
       release();
-      router.replace({pathname: '/(account)/memory/[id]', params: {id: result.id, saved: '1'}});
+      router.replace({pathname: '/(account)/memory/[id]', params: {id: saved.id, saved: '1'}});
     } catch (cause) {
       setError(cause instanceof ApiError && cause.status === 422
-        ? 'Use a complete http:// or https:// link, without spaces or sign-in credentials.'
+        ? 'Enter a complete public http:// or https:// link without spaces or credentials.'
         : errorMessage(cause));
-      // Keep the original request/key after network ambiguity to prevent double saves.
+      // An ambiguous network result reuses the identical request and key.
       if (cause instanceof ApiError && [400, 401, 413, 422].includes(cause.status)) {
         attempt.current = null;
         setLocked(false);
       }
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
-  return <Screen>
-    <TextAction label="Back to save" onPress={() => router.back()}/>
-    <Type>ONE LINK TO KEEP</Type>
-    <Type title>Save a link.</Type>
-    <Type muted>Keep the original address, then find it again whenever you need it.</Type>
+  return <Screen compact>
+    <TextAction label="Back" onPress={() => router.back()}/>
+    <Type variant="eyebrow" muted>ONE LINK TO KEEP</Type>
+    <Type variant="section">Save a link.</Type>
+    <Type muted>Paste it here. RecallBox will save the source and check which details are available.</Type>
     <Input label="Link" value={url} onChangeText={setUrl} keyboardType="url"
-      autoCapitalize="none" autoCorrect={false} maxLength={4096}
-      editable={!locked && !busy} placeholder="https://example.com/article"/>
-    <Input label="Title (optional)" value={title} onChangeText={setTitle}
-      maxLength={240} editable={!locked && !busy} placeholder="What’s worth remembering?"/>
-    {!!error && <Notice>{error}</Notice>}
-    {locked && !busy && <Notice>Save not confirmed. Retrying uses the original address and save key.</Notice>}
-    <Button label={locked ? 'Retry this save' : 'Save link'} busy={busy}
-      disabled={!url.trim()} onPress={() => void save()}/>
+      autoFocus={!locked} autoCapitalize="none" autoCorrect={false}
+      maxLength={4096} editable={!busy && !locked}
+      placeholder="https://example.com/article"/>
+    {!!error && <Notice kind="error">{error}</Notice>}
+    {locked && !busy && <Notice>
+      Save not confirmed. Retry keeps the same URL and save key to avoid duplicates.
+    </Notice>}
+    <Button label={locked ? 'Retry this save' : 'Save link'}
+      busy={busy} disabled={!url.trim()} onPress={() => void save()}/>
+    <Type muted variant="caption">
+      No title, tags or collection required. Some sites allow only a link or public preview.
+    </Type>
   </Screen>;
 }
