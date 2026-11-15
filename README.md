@@ -27,7 +27,7 @@ Universal URL Extractor aims to make this work **modular, measurable, and transp
 | **Status** | Working experimental implementation in this repo | Local Android prototype in this repo |
 | **Focus** | URL extraction, normalized output, engine benchmarking | Save, rediscover, and eventually act on personal saved content |
 | **Typical user** | Developers, researchers, knowledge-system builders | People saving links, articles, screenshots, and notes |
-| **Boundary** | Does **not** provide semantic search, user accounts, or a consumer UI | Would consume the extractor as one ingestion component |
+| **Boundary** | Does **not** provide semantic search, user accounts, or a consumer UI | Separate FastAPI/Expo stack; not yet connected to extractor workers |
 
 RecallBox consumes the extractor as a separate local product. The complete release target remains [the RecallBox PRD](docs/RECALLBOX_PRODUCT_PRD.md).
 
@@ -156,7 +156,7 @@ The extractor is intended to remain usable independently of RecallBox.
 - [Benchmark Lab](benchmarks/README.md) — evaluation, datasets, review process, and scoring
 - [Architecture](docs/PROJECT_ARCHITECTURE.md) · [Diagrams](docs/ARCHITECTURE_DIAGRAMS.md) · [Database schema](docs/DATABASE_SCHEMA.md)
 - [Roadmap](ROADMAP.md) — current state, next milestones, and deferred ideas
-- [RecallBox vision](docs/RECALLBOX_VISION.md) — future consumer app, clearly separate from this toolkit
+- [RecallBox vision](docs/RECALLBOX_VISION.md) — product direction distinct from this extractor
 - [Contributing](CONTRIBUTING.md) — contribution process and lightweight local verification
 
 ## Contributing
@@ -184,3 +184,9 @@ cursor-based mobile Inbox/sync client. See the
 [S2 implementation and verification guide](docs/RECALLBOX_S2_IMPLEMENTATION.md)
 and [API contract](docs/RECALLBOX_S2_API.md). The current prototype adds capture,
 durable ingestion and local search. No public deployment is configured.
+
+The integrated source also includes HTTP(S) bookmarks and manual Collections.
+Migrate through `0004_collections`; capture and semantic migrations precede bookmarks
+so existing saved media and vectors remain intact. The Sunday planning documents
+record earlier acceptance gates; see [the prototype guide](docs/RECALLBOX_PROTOTYPE.md)
+for historical execution evidence. Physical-device acceptance of this merge is pending.

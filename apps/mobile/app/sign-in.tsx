@@ -5,6 +5,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { configured, oidc } from '../src/config';
+import { ApiError } from '../src/api';
 import { useSession } from '../src/session';
 import { completeAuth, rememberAuth } from '../src/pending-auth';
 import { Button, Notice, Screen, Type } from '../src/ui';
@@ -43,8 +44,17 @@ export default function SignIn() {
       if (result.type !== 'success' || result.params.state !== request.state || !result.params.code || !request.codeVerifier) throw new Error('Sign-in was not completed.');
       await completeAuth(result.params, signIn);
       router.replace('/(account)');
-    } catch { setError('Sign-in could not be completed. Check your connection and try again.'); }
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'identity_rejected') {
+        setError('The identity service could not verify this sign-in. Start a new sign-in attempt.');
+      } else if (cause instanceof ApiError && cause.status === 503) {
+        setError('Your local RecallBox server is unavailable. Check that it is running before retrying.');
+      } else {
+        // Do not display authorization codes, token responses or provider URLs.
+        setError('Sign-in could not be completed. Check your connection and try again.');
+      }
+    }
     finally { setBusy(false); }
   }
-  return <Screen><Type>YOUR FIRST PAGE</Type><Type title>A space that’s yours.</Type><Type muted>Continue securely in your browser, then come back here.</Type>{!configured && <Notice>Sign-in is awaiting identity-provider setup. No account can be created yet.</Notice>}{error && <Notice>{error}</Notice>}<Button label="Continue securely" onPress={() => void login()} busy={busy} disabled={!configured}/><Button label="Back to welcome" onPress={() => router.replace('/')}/></Screen>;
+  return <Screen><Type>YOUR FIRST PAGE</Type><Type title>A space that’s yours.</Type><Type muted>Continue securely in your browser, then come back here.</Type>{!configured && <Notice>Sign-in is awaiting identity-provider setup. No account can be created yet.</Notice>}{error && <Notice>{error}</Notice>}<Button label="Continue securely" onPress={() => void login()} busy={busy} disabled={!configured}/><Button label="Back to welcome" variant="secondary" onPress={() => router.replace('/')}/></Screen>;
 }

@@ -14,13 +14,14 @@ export default function NewNote() {
   const [error, setError] = useState('');
   const attempt = useRef<{key: string; title: string; content: string} | null>(null);
   const [locked, setLocked] = useState(false);
-  const release = usePreventRemove(Boolean(title || content), ({repeat}) => {
+  const [leaving, setLeaving] = useState(false);
+  const release = usePreventRemove(Boolean(title || content) && !leaving, ({repeat}) => {
     if (busy) { Alert.alert('Save in progress', 'Wait for the save to finish before leaving.'); return; }
     Alert.alert(locked ? 'Save not confirmed' : 'Leave this draft?', locked
       ? 'The server may have saved this note. Retry safely here, or check your inbox before creating it again.'
       : 'This draft is only on this screen. Leaving discards it.', [
       {text: 'Keep writing', style: 'cancel'},
-      {text: 'Leave', style: 'destructive', onPress: () => { release(); repeat(); }},
+      {text: 'Leave', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
     ]);
   });
   async function save() {
@@ -30,6 +31,7 @@ export default function NewNote() {
     setLocked(true);
     try {
       const note = await create({title: attempt.current.title, content: attempt.current.content}, attempt.current.key);
+      setLeaving(true);
       release();
       router.replace({pathname: '/(account)/memory/[id]', params: {id: note.id, saved: '1'}});
     } catch (cause) {

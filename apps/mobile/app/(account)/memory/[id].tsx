@@ -24,17 +24,20 @@ export default function MemoryDetail() {
   const [unavailable, setUnavailable] = useState(false);
   const [imageSource,setImageSource] = useState<ImageURISource | null>(null);
   const [imageError,setImageError] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const opening = useRef(false);
   const dirty = Boolean(base && (title !== base.title || content !== base.content || collection !== base.collection));
-  const release = usePreventRemove(dirty, ({repeat}) => {
+  const release = usePreventRemove(dirty && !leaving, ({repeat}) => {
     if (busy) { Alert.alert('Saving changes', 'Wait for the request to finish.'); return; }
     Alert.alert('Leave your draft?', 'Your unsaved edits will be discarded.', [
       {text: 'Keep editing', style: 'cancel'},
-      {text: 'Discard edits', style: 'destructive', onPress: () => { release(); repeat(); }},
+      {text: 'Discard edits', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
     ]);
   });
   function failed(cause: unknown) {
-    setError(errorMessage(cause));
+    setError(base?.kind === 'link' && cause instanceof ApiError && cause.status === 422
+      ? 'Use a complete http:// or https:// link without spaces or sign-in credentials.'
+      : errorMessage(cause));
     if (cause instanceof ApiError && cause.code === 'version_conflict' && cause.current) setConflict(cause.current);
     if (cause instanceof ApiError && (cause.status === 404 || cause.status === 410)) setUnavailable(true);
   }
@@ -108,15 +111,26 @@ export default function MemoryDetail() {
   }
   function confirmDelete() {
     if (!base || busy) return;
-    Alert.alert('Delete this note?', 'It will leave your inbox and disappear from your other devices after sync.', [
+    Alert.alert(base.kind === 'link' ? 'Delete this link?' : 'Delete this note?', 'It will leave your library and disappear from your other devices after sync.', [
       {text: 'Keep note', style: 'cancel'},
       {text: 'Delete note', style: 'destructive', onPress: () => void (async () => {
         setBusy(true); setError('');
-        try { await store.remove(id, base.version); release(); router.replace('/(account)'); }
+        try { await store.remove(id, base.version); setLeaving(true); release(); router.replace('/(account)'); }
         catch (cause) { failed(cause); }
         finally { setBusy(false); }
       })()},
     ]);
+  }
+  async function openOriginal() {
+    if (!base || base.kind !== 'link' || !/^https?:\/\/\S+$/i.test(base.content)) {
+      setError('This saved address cannot be opened.');
+      return;
+    }
+    try {
+      await Linking.openURL(base.content);
+    } catch {
+      setError('Could not open the original link on this device.');
+    }
   }
   const remote = store.items.find(note => note.id === id);
   return <Screen>
@@ -141,7 +155,7 @@ export default function MemoryDetail() {
       {unavailable && <Notice>This note is no longer available. Your draft stays here until you leave this screen.</Notice>}
       <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
       <Input label="Collection" value={collection} onChangeText={setCollection} maxLength={80} editable={!busy} placeholder="e.g. Travel, Reading, Ideas"/>
-      <Input label="Note" value={content} onChangeText={setContent} maxLength={100000} multiline
+      <Input label={base.kind === 'link' ? 'Original URL' : 'Note'} value={content} onChangeText={setContent} maxLength={base.kind === 'link' ? 4096 : 100000} autoCapitalize={base.kind === 'link' ? 'none' : 'sentences'} autoCorrect={base.kind !== 'link'} multiline
         textAlignVertical="top" style={{minHeight: 240}} editable={!busy}/>
       {conflict && <View style={{gap: 16}}>
         <Type>Latest saved version ({conflict.version})</Type><Type>{conflict.title || 'Untitled note'}</Type><Type muted>{conflict.content}</Type>
@@ -155,12 +169,16 @@ export default function MemoryDetail() {
           }},
         ])}/>
       </View>}
+      {base.kind === 'link' && <Button label="Open original link" disabled={busy || unavailable}
+        onPress={() => void openOriginal()}/>}
+      <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
+        onPress={() => router.push({pathname: '/(account)/add-to-collection', params: {memoryId: id}})}/>
       <Button label="Save changes" busy={busy} disabled={!dirty || !content.trim() || unavailable || Boolean(conflict)}
         onPress={() => void update({title, content, collection})}/>
       <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
-        <TextAction label={base.starred ? 'Unstar note' : 'Star note'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({starred: !base.starred})}/>
+        <TextAction label={base.starred ? 'Unstar' : 'Star'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({starred: !base.starred})}/>
         <TextAction label={base.archived ? 'Move to inbox' : 'Archive note'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({archived: !base.archived})}/>
-        <TextAction label="Delete note" disabled={busy || unavailable} onPress={confirmDelete}/>
+        <TextAction label={base.kind === 'link' ? 'Delete saved link' : 'Delete note'} disabled={busy || unavailable} onPress={confirmDelete}/>
       </View>
     </>}
   </Screen>;
