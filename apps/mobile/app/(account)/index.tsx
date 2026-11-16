@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { MemorySummary } from '../../src/api';
 import { errorMessage, useMemories } from '../../src/memories';
-import { Button, FilterChip, Notice, RecoveryState, TextAction, Type, tokens, usePalette } from '../../src/ui';
+import { Button, Notice, RecoveryState, TextAction, Type, tokens, usePalette } from '../../src/ui';
 import { EmptyLibrary } from '../../src/empty-library';
 import { MemoryCard } from '../../src/memory-card';
 
@@ -27,6 +27,14 @@ export default function Inbox() {
   const topics = Array.from(new Set(usable.map(topicOf).filter((value): value is string => Boolean(value))))
     .slice(0, 5);
   const visible = topic ? usable.filter(item => topicOf(item) === topic) : usable;
+  const filters = ['All', 'Starred', ...topics, 'Archived'];
+  const selectedFilter = store.archived ? 'Archived' : store.starredOnly ? 'Starred' : topic ?? 'All';
+  function selectFilter(label: string) {
+    if (label === 'All') { setTopic(null); void store.refresh(false, false).catch(() => undefined); }
+    else if (label === 'Starred') { setTopic(null); void store.refresh(false, true).catch(() => undefined); }
+    else if (label === 'Archived') { setTopic(null); void store.refresh(true, false).catch(() => undefined); }
+    else { setTopic(label); void store.refresh(false, false).catch(() => undefined); }
+  }
   useFocusEffect(useCallback(() => { void store.sync(); }, [store.sync]));
   async function toggle(note: MemorySummary, field: 'starred' | 'archived') {
     if (working) return;
@@ -39,19 +47,33 @@ export default function Inbox() {
     <FlatList data={visible} keyExtractor={note => note.id}
       contentContainerStyle={{padding: tokens.space.large, gap: 12, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
-      ListHeaderComponent={<View style={{gap: 20}}>
-        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+      ListHeaderComponent={<View style={{gap: 0}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4}}>
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 9}}>
-            <View style={{width: 29, height: 29, borderRadius: 8, backgroundColor: '#284D3B',
+            <View accessible={false} style={{width: 29, height: 29, borderRadius: 8, backgroundColor: '#284D3B',
               alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{color: '#FFFFFF', fontSize: 19}}>▯</Text>
+              <View style={{width: 14, height: 18, borderWidth: 1.8, borderColor: '#FFFFFF',
+                borderTopLeftRadius: 2, borderTopRightRadius: 2, borderBottomWidth: 0}}/>
+              <View style={{position: 'absolute', bottom: 5, width: 10, height: 10,
+                borderTopWidth: 1.8, borderLeftWidth: 1.8, borderColor: '#FFFFFF',
+                transform: [{rotate: '45deg'}]}}/>
             </View>
-            <Type variant="label" style={{fontSize: 16, letterSpacing: -0.4}}>recallbox</Type>
+            <Type variant="label" style={{fontSize: 16, fontWeight: '700', letterSpacing: -0.5}}>recallbox</Type>
           </View>
-          <TextAction label="Profile" onPress={() => router.push('/(account)/account')}/>
+          <Pressable accessibilityRole="button" accessibilityLabel="Account and settings"
+            onPress={() => router.push('/(account)/account')}
+            style={({pressed}) => ({width: 44, height: 44, borderRadius: 22,
+              backgroundColor: pressed ? p.line : p.surfaceMuted, alignItems: 'center', justifyContent: 'center'})}>
+            <View style={{width: 10, height: 10, borderRadius: 5, borderWidth: 1.8, borderColor: p.ink, marginBottom: 2}}/>
+            <View style={{width: 19, height: 9, borderTopLeftRadius: 11, borderTopRightRadius: 11,
+              borderWidth: 1.8, borderBottomWidth: 0, borderColor: p.ink}}/>
+          </Pressable>
         </View>
+        <View style={{height: 18}}/>
         <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
+        <View style={{height: 10}}/>
         <Type muted style={{fontSize: 14, lineHeight: 22}}>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : usable.length > 0 ? 'The things worth remembering.' : 'Everything you wanted to remember, in one place.'}</Type>
+        <View style={{height: 22}}/>
         <Pressable accessibilityRole="button" accessibilityLabel="Find something you saved"
           onPress={() => router.push('/(account)/search')}
           style={({pressed}) => ({minHeight: 56, paddingHorizontal: 18, paddingVertical: 16,
@@ -59,21 +81,24 @@ export default function Inbox() {
             backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
           <Type muted style={{fontSize: 13}}>⌕  {usable.length > 0 ? 'Find that thing you saved...' : 'Find something you saved...'}</Type>
         </Pressable>
-        {(usable.length > 0 || store.starredOnly || store.archived) && <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
-          <FilterChip label="All" selected={!store.starredOnly && !store.archived && !topic}
-            disabled={store.loading} onPress={() => {setTopic(null); void store.refresh(false, false).catch(() => undefined);}}/>
-          <FilterChip label="Starred" selected={store.starredOnly}
-            disabled={store.loading} onPress={() => {setTopic(null); void store.refresh(false, true).catch(() => undefined);}}/>
-          <FilterChip label="Archive" selected={store.archived}
-            disabled={store.loading} onPress={() => {setTopic(null); void store.refresh(true, false).catch(() => undefined);}}/>
-          {!store.starredOnly && !store.archived && topics.map(label =>
-            <FilterChip key={label} label={label} selected={topic === label}
-              onPress={() => setTopic(current => current === label ? null : label)}/>)}
-        </View>}
-        {usable.length > 0 && <TextAction
-          label={unfinishedCount ? `Recently captured · ${unfinishedCount} unfinished` : 'Recently captured'}
-          onPress={() => router.push('/(account)/captured')}/>}
-        {usable.length > 0 && <Type variant="section">{store.archived ? 'Archived' : store.starredOnly ? 'Starred' : topic || 'Recently saved'}</Type>}
+        {(usable.length > 0 || store.starredOnly || store.archived) && <>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{gap: 8, alignItems: 'center', paddingVertical: 16}}>
+            {filters.map(label => {
+              const selected = selectedFilter === label;
+              return <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Filter: ${label}`}
+                accessibilityState={{selected}} disabled={store.loading} onPress={() => selectFilter(label)}
+                style={{minHeight: 40, borderRadius: 30, borderWidth: 1, borderColor: selected ? p.accent : p.line,
+                  backgroundColor: selected ? p.accent : 'transparent', paddingHorizontal: 14,
+                  alignItems: 'center', justifyContent: 'center'}}>
+                <Text style={{fontSize: 12, fontWeight: '600', color: selected ? p.onAccent : p.muted}}>{label}</Text>
+              </Pressable>;
+            })}
+          </ScrollView>
+          <Type style={{fontSize: 14, fontWeight: '700', marginTop: 14, marginBottom: 10}}>
+            {store.archived ? 'Archived' : store.starredOnly ? 'Starred' : topic || 'Recently saved'}
+          </Type>
+        </>}
         {(store.error || error) && <Notice kind="error">{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
@@ -110,8 +135,18 @@ export default function Inbox() {
         memory={item} busy={Boolean(working)}
         onOpen={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
         onStar={() => void toggle(item, 'starred')}/>}
-      ListFooterComponent={store.hasMore ? <Button label="Load earlier notes" busy={store.loading}
-        onPress={() => void store.more().catch(() => undefined)}/> : <View style={{height: 16}}/>}
+      ListFooterComponent={<View style={{paddingTop: 12, paddingBottom: 16}}>
+        {usable.length > 0 && <Pressable accessibilityRole="button" accessibilityLabel="Recently captured"
+          onPress={() => router.push('/(account)/captured')}
+          style={{minHeight: 49, borderRadius: 13, borderWidth: 1, borderColor: p.line,
+            backgroundColor: p.surface, paddingHorizontal: 12, flexDirection: 'row',
+            alignItems: 'center', justifyContent: 'space-between'}}>
+          <Type style={{fontSize: 12, fontWeight: '700'}}>Recently captured</Type>
+          <Type muted variant="caption">{unfinishedCount} items  ›</Type>
+        </Pressable>}
+        {store.hasMore && <Button label="Load earlier notes" busy={store.loading}
+        onPress={() => void store.more().catch(() => undefined)}/>}
+      </View>}
     />
   </SafeAreaView>;
 }
