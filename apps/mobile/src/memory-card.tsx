@@ -69,15 +69,17 @@ export function MemoryCard({memory, onOpen, onStar, busy = false}: {
           fontSize: 23}}>{memory.kind === 'note' ? '≡' : memory.kind === 'pdf' ? '▤' : memory.kind === 'image' ? '▧' : '↗'}</Text>
       </View>
       <View style={{flex: 1, gap: 3}}>
-        <Type variant="label" numberOfLines={2}>{humanTitle(memory)}</Type>
-        <Type muted variant="caption" numberOfLines={1}>{meta}</Type>
-        {!!detail && <Type muted variant="caption" numberOfLines={1}>{detail}</Type>}
+        <Type variant="label" style={{fontSize: 14, lineHeight: 19, fontWeight: '700'}} numberOfLines={2}>{humanTitle(memory)}</Type>
+        <Type muted variant="caption" style={{fontSize: 11, lineHeight: 16}} numberOfLines={1}>{meta}</Type>
+        {!!detail && <Type muted variant="caption" style={{fontSize: 10, lineHeight: 15}} numberOfLines={1}>{detail}</Type>}
       </View>
     </Pressable>
     <IconButton label={memory.starred ? 'Remove from Starred' : 'Add to Starred'}
       disabled={busy} onPress={onStar}>
-      <Text style={{fontSize: 24, color: memory.starred ? '#B28A36' : p.muted,
-        lineHeight: 28}}>{memory.starred ? '★' : '☆'}</Text>
+      <View style={{width: 25, height: 25, alignItems: 'center', justifyContent: 'center'}}>
+        <Text style={{fontSize: 25, color: memory.starred ? '#AE7C33' : p.muted,
+          lineHeight: 29}}>{memory.starred ? '★' : '☆'}</Text>
+      </View>
     </IconButton>
   </View>;
 }
