@@ -96,7 +96,7 @@ export default function OrganizeMemory() {
         No reliable category suggestion was found. Pick one if you like.
       </Type>}
       {topic!==null && <TextAction label="Use source suggestion"
-        onPress={()=>setTopic(null)}/>
+        onPress={()=>setTopic(null)}/>} 
       <Type variant="label">Personal tags</Type>
       {tags?.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
         {tags.map(label=><Pressable key={label} accessibilityRole="button"
