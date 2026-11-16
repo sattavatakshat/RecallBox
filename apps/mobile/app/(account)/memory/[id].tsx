@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, ImageURISource, Linking, View } from 'react-native';
+import { Alert, Image, ImageURISource, Linking, Modal, Pressable, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { ApiError, Memory, memoriesApi } from '../../../src/api';
 import { apiURL } from '../../../src/config';
@@ -24,6 +24,7 @@ export default function MemoryDetail() {
   const [unavailable, setUnavailable] = useState(false);
   const [imageSource,setImageSource] = useState<ImageURISource | null>(null);
   const [imageError,setImageError] = useState(false);
+  const [viewingImage, setViewingImage] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showSourceDetails, setShowSourceDetails] = useState(false);
@@ -57,7 +58,7 @@ export default function MemoryDetail() {
   useFocusEffect(useCallback(() => { if (!base) void load(); }, [id, base, store.get]));
   useEffect(() => {
     let active=true;
-    setImageSource(null);setImageError(false);
+    setImageSource(null);setImageError(false);setViewingImage(false);
     if(base?.kind==='image' && ['ready','metadata_only'].includes(base.processing_state)) {
       void authorized(async token => ({uri:`${apiURL()}/v1/memories/${base.id}/asset`,headers:{Authorization:`Bearer ${token}`},cache:'reload' as const}))
         .then(source => {if(active) setImageSource(source);}).catch(() => {if(active) setImageError(true);});
@@ -170,10 +171,35 @@ export default function MemoryDetail() {
       {base.processing_state === 'failed' && <Notice kind="error">
         We kept your source, but couldn't finish processing it. Retry below.
       </Notice>}
-      {imageSource && !imageError && <Image accessibilityLabel="Saved image" source={imageSource}
-        resizeMode="contain" style={{width:'100%',height:280,borderRadius:18}}
-        onError={() => setImageError(true)}/>}
+      {base.kind === 'image' && imageSource && !imageError && <>
+        <Pressable accessibilityRole="button" accessibilityLabel="View saved photo full screen"
+          onPress={() => setViewingImage(true)} style={({pressed}) => ({
+            opacity:pressed ? 0.78 : 1,borderRadius:18,overflow:'hidden',
+          })}>
+          <Image accessibilityLabel="Saved photo preview" source={imageSource}
+            resizeMode="contain" style={{width:'100%',height:280,borderRadius:18}}
+            onError={() => setImageError(true)}/>
+        </Pressable>
+        <TextAction label="View photo full screen" onPress={() => setViewingImage(true)}/>
+      </>}
       {imageError && <Notice>Preview unavailable. You can still open the saved original.</Notice>}
+      <Modal visible={viewingImage && !!imageSource && !imageError} transparent
+        animationType="fade" onRequestClose={() => setViewingImage(false)}>
+        <View style={{flex:1,backgroundColor:'#101512',justifyContent:'center',
+          paddingHorizontal:12,paddingTop:36,paddingBottom:24}}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close full-screen photo"
+            onPress={() => setViewingImage(false)} style={{alignSelf:'flex-end',padding:16,
+              minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center'}}>
+            <Text style={{color:'#FFFFFF',fontSize:26}}>×</Text>
+          </Pressable>
+          {!!imageSource && <Image accessibilityLabel="Full-screen saved photo"
+            source={imageSource} resizeMode="contain" style={{width:'100%',flex:1}}
+            onError={() => {setImageError(true);setViewingImage(false);}}/>}
+        </View>
+      </Modal>
+      {base.kind === 'pdf' && <Notice>
+        This PDF is saved privately. Open it in a compatible app to read or share the original.
+      </Notice>}
       {base.kind === 'note' && !editing && <Type style={{lineHeight:27}}>
         {base.content || 'No note text yet.'}
       </Type>}
@@ -195,7 +221,8 @@ export default function MemoryDetail() {
           } else void openOriginal();
         }}/>}
       {['image','pdf'].includes(base.kind) &&
-        <Button label="Open or share saved original" busy={busy} onPress={() => void original()}/>}
+        <Button label={base.kind === 'pdf' ? 'Open or share PDF' : 'Share original photo'}
+          busy={busy} onPress={() => void original()}/>}
       {['failed','metadata_only'].includes(base.processing_state) &&
         <TextAction label="Retry getting details" disabled={busy}
           onPress={() => void retryProcessing()}/>}
