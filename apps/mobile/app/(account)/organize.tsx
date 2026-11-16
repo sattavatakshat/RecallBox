@@ -1,7 +1,8 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import {Alert, Pressable, View} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams, usePreventRemove} from 'expo-router';
-import {ApiError, Memory} from '../../src/api';
+import {ApiError, Collection, Memory, collectionsApi} from '../../src/api';
+import {useSession} from '../../src/session';
 import {useMemories} from '../../src/memories';
 import {Button, FilterChip, Input, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
@@ -12,6 +13,8 @@ const equal=(a:string[]|null,b:string[]|null|undefined)=>JSON.stringify(a)===JSO
 export default function OrganizeMemory() {
   const {id}=useLocalSearchParams<{id:string}>();
   const store=useMemories();
+  const {authorized}=useSession();
+  const auth=useRef(authorized); auth.current=authorized;
   const p=usePalette();
   const [memory,setMemory]=useState<Memory|null>(null);
   const [topic,setTopic]=useState<string|null>(null);
@@ -20,9 +23,16 @@ export default function OrganizeMemory() {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [leaving,setLeaving]=useState(false);
+  const [allCollections,setAllCollections]=useState<Collection[]>([]);
+  const [savedMembership,setSavedMembership]=useState<string[]>([]);
+  const [selectedMembership,setSelectedMembership]=useState<string[]>([]);
+  const [collectionError,setCollectionError]=useState('');
   const chosenTopic=topic==='Uncategorized'?null:(topic??memory?.suggested_topic??null);
-  const dirty=Boolean(memory && (topic!==(memory.topic_override??null)||
+  const detailsChanged=Boolean(memory && (topic!==(memory.topic_override??null)||
     !equal(tags,memory.tags_override)));
+  const membershipChanged=JSON.stringify([...selectedMembership].sort()) !==
+    JSON.stringify([...savedMembership].sort());
+  const dirty=detailsChanged||membershipChanged;
   const release=usePreventRemove(dirty&&!leaving,({repeat})=>{
     Alert.alert('Discard changes?','Your organization changes have not been saved.',[
       {text:'Keep editing',style:'cancel'},
@@ -38,6 +48,18 @@ export default function OrganizeMemory() {
       const saved=await store.get(id);
       setMemory(saved);setTopic(saved.topic_override??null);
       setTags(saved.tags_override??null);
+      setCollectionError('');
+      try {
+        const [page,current]=await Promise.all([
+          auth.current(token=>collectionsApi.list(token)),
+          auth.current(token=>collectionsApi.forMemory(token,id)),
+        ]);
+        setAllCollections(page.items);
+        const existing=current.items.map(entry=>entry.id);
+        setSavedMembership(existing);setSelectedMembership(existing);
+      } catch {
+        setCollectionError('Collections could not load. Your topic and tags are still editable.');
+      }
     }catch{setError('Could not open this memory. Check your connection and retry.');}
     finally{setBusy(false);}
   },[id,store.get]);
@@ -57,8 +79,20 @@ export default function OrganizeMemory() {
     if(!memory||busy||!dirty)return;
     setBusy(true);setError('');
     try{
-      await store.edit(memory.id,{expected_version:memory.version,
-        topic_override:topic,tags_override:tags});
+      if(detailsChanged) {
+        const updated=await store.edit(memory.id,{expected_version:memory.version,
+          topic_override:topic,tags_override:tags});
+        setMemory(updated);
+      }
+      const applied=new Set(savedMembership);
+      for(const group of allCollections) {
+        const was=applied.has(group.id),now=selectedMembership.includes(group.id);
+        if(was===now)continue;
+        if(now)await auth.current(token=>collectionsApi.add(token,group.id,memory.id));
+        else await auth.current(token=>collectionsApi.removeItem(token,group.id,memory.id));
+        if(now)applied.add(group.id); else applied.delete(group.id);
+        setSavedMembership([...applied]); // Preserve successful changes if a later request fails.
+      }
       setLeaving(true);release();router.back();
     }catch(cause){
       if(cause instanceof ApiError && cause.code==='version_conflict' && cause.current) {
@@ -120,11 +154,24 @@ export default function OrganizeMemory() {
         <Type muted variant="caption">Source labels do not mean that inaccessible content was understood.</Type>
       </View>
       <Type variant="section">Collections</Type>
-      <Type muted>Use your own collections to group memories. One memory can appear in several.</Type>
-      <Button label="Add to a collection" variant="secondary" disabled={busy||dirty}
-        onPress={()=>router.push({pathname:'/(account)/add-to-collection',
-          params:{memoryId:memory.id}})}/>
-      {dirty&&<Type muted variant="caption">Save changes before opening the collection picker.</Type>}
+      <Type muted>Choose any of your own collections. Checking a box never deletes the memory.</Type>
+      {!!collectionError&&<Notice kind="error">{collectionError}</Notice>}
+      {allCollections.map(group=><Pressable key={group.id} accessibilityRole="checkbox"
+        accessibilityLabel={group.name}
+        accessibilityState={{checked:selectedMembership.includes(group.id),disabled:busy}}
+        disabled={busy} onPress={()=>setSelectedMembership(current=>
+          current.includes(group.id)?current.filter(x=>x!==group.id):[...current,group.id])}
+        style={{minHeight:52,paddingHorizontal:14,borderRadius:12,
+          borderWidth:1,borderColor:p.line,backgroundColor:p.surface,
+          flexDirection:'row',alignItems:'center',gap:12}}>
+        <Type style={{fontSize:20}}>{selectedMembership.includes(group.id)?'☑':'□'}</Type>
+        <Type variant="label">{group.name}</Type>
+      </Pressable>)}
+      {!allCollections.length&&!collectionError&&<Type muted variant="caption">
+        You haven't created any collections yet.
+      </Type>}
+      <TextAction label="Manage collections" disabled={busy||dirty}
+        onPress={()=>router.push('/(account)/collections')}/>
       <Button label="Save organization" busy={busy} disabled={!dirty} onPress={()=>void save()}/>
     </>}
   </Screen>;
