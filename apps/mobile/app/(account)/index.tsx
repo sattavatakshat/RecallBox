@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { MemorySummary } from '../../src/api';
 import { errorMessage, useMemories } from '../../src/memories';
-import { Button, Notice, TextAction, Type, tokens, usePalette } from '../../src/ui';
+import { Button, FilterChip, Notice, TextAction, Type, tokens, usePalette } from '../../src/ui';
 import { EmptyLibrary } from '../../src/empty-library';
 import { MemoryCard } from '../../src/memory-card';
 
@@ -13,6 +13,17 @@ export default function Inbox() {
   const p = usePalette();
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [topic, setTopic] = useState<string | null>(null);
+  // Only a finalized, usable memory belongs in the Library. An honestly
+  // link-only result (metadata_only) is usable; queued/failed ones remain
+  // discoverable through Recently Captured instead.
+  const usable = store.items.filter(item =>
+    item.kind === 'note' || item.processing_state === 'ready' || item.processing_state === 'metadata_only');
+  const unfinishedCount = store.items.filter(item =>
+    item.processing_state === 'queued' || item.processing_state === 'processing' || item.processing_state === 'failed').length;
+  const topics = Array.from(new Set(usable.flatMap(item => item.labels || [])))
+    .filter(label => label.length > 0).slice(0, 5);
+  const visible = topic ? usable.filter(item => item.labels?.includes(topic)) : usable;
   useFocusEffect(useCallback(() => { void store.sync(); }, [store.sync]));
   async function toggle(note: MemorySummary, field: 'starred' | 'archived') {
     if (working) return;
@@ -22,7 +33,7 @@ export default function Inbox() {
     finally { setWorking(null); }
   }
   return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}>
-    <FlatList data={store.items} keyExtractor={note => note.id}
+    <FlatList data={visible} keyExtractor={note => note.id}
       contentContainerStyle={{padding: tokens.space.large, gap: 12, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
       ListHeaderComponent={<View style={{gap: 20}}>
@@ -37,22 +48,29 @@ export default function Inbox() {
           <TextAction label="Profile" onPress={() => router.push('/(account)/account')}/>
         </View>
         <Type title>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
-        <Type muted style={{fontSize: 14, lineHeight: 22}}>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : store.items.length > 0 ? 'The things worth remembering.' : 'Everything you wanted to remember, in one place.'}</Type>
+        <Type muted style={{fontSize: 14, lineHeight: 22}}>{store.archived ? 'Notes and links you’ve put aside, still here when you need them.' : usable.length > 0 ? 'The things worth remembering.' : 'Everything you wanted to remember, in one place.'}</Type>
         <Pressable accessibilityRole="button" accessibilityLabel="Find something you saved"
           onPress={() => router.push('/(account)/search')}
           style={({pressed}) => ({minHeight: 56, paddingHorizontal: 18, paddingVertical: 16,
             borderRadius: tokens.radius, borderWidth: 1, borderColor: p.line,
             backgroundColor: p.surface, justifyContent: 'center', opacity: pressed ? 0.65 : 1})}>
-          <Type muted style={{fontSize: 13}}>⌕  {store.items.length > 0 ? 'Find that thing you saved...' : 'Find something you saved...'}</Type>
+          <Type muted style={{fontSize: 13}}>⌕  {usable.length > 0 ? 'Find that thing you saved...' : 'Find something you saved...'}</Type>
         </Pressable>
-        {(store.items.length > 0 || store.starredOnly || store.archived) && <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
-          <TextAction label={store.starredOnly ? 'All saved' : 'Starred only'} disabled={store.loading}
-            onPress={() => void store.refresh(store.archived, !store.starredOnly).catch(() => undefined)}/>
-          <TextAction label={store.archived ? 'Return to library' : 'Open archive'} disabled={store.loading}
-            onPress={() => void store.refresh(!store.archived, store.starredOnly).catch(() => undefined)}/>
+        {(usable.length > 0 || store.starredOnly || store.archived) && <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8}}>
+          <FilterChip label="All" selected={!store.starredOnly && !store.archived && !topic}
+            disabled={store.loading} onPress={() => {setTopic(null); void store.refresh(false, false).catch(() => undefined);}}/>
+          <FilterChip label="Starred" selected={store.starredOnly}
+            disabled={store.loading} onPress={() => {setTopic(null); void store.refresh(false, true).catch(() => undefined);}}/>
+          <FilterChip label="Archive" selected={store.archived}
+            disabled={store.loading} onPress={() => {setTopic(null); void store.refresh(true, false).catch(() => undefined);}}/>
+          {!store.starredOnly && !store.archived && topics.map(label =>
+            <FilterChip key={label} label={label} selected={topic === label}
+              onPress={() => setTopic(current => current === label ? null : label)}/>)}
         </View>}
-        {store.items.length > 0 && <TextAction label="Recently captured" onPress={() => router.push('/(account)/captured')}/>}
-        {store.items.length > 0 && <Type variant="section">{store.archived ? 'Archived' : store.starredOnly ? 'Starred' : 'Recently saved'}</Type>}
+        {usable.length > 0 && <TextAction
+          label={unfinishedCount ? `Recently captured · ${unfinishedCount} unfinished` : 'Recently captured'}
+          onPress={() => router.push('/(account)/captured')}/>}
+        {usable.length > 0 && <Type variant="section">{store.archived ? 'Archived' : store.starredOnly ? 'Starred' : topic || 'Recently saved'}</Type>}
         {(store.error || error) && <Notice>{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
@@ -64,6 +82,12 @@ export default function Inbox() {
               <Type muted>Check your connection and try again. Your existing saves haven't been deleted.</Type>
               <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>
             </View>
+          : topic
+            ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
+                <Type variant="section">Nothing saved under {topic}.</Type>
+                <Type muted>Topics are suggested only when supported by a source.</Type>
+                <Button variant="secondary" label="Show all memories" onPress={() => setTopic(null)}/>
+              </View>
           : store.starredOnly || store.archived
             ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
                 <Type variant="section">{store.starredOnly ? 'No starred memories yet.' : 'Nothing tucked away.'}</Type>
@@ -73,8 +97,14 @@ export default function Inbox() {
                 <Button label="Back to all memories" variant="secondary"
                   onPress={() => void store.refresh(false, false).catch(() => undefined)}/>
               </View>
-            : <EmptyLibrary onSave={() => router.push('/(account)/save')}
-                onCaptured={() => router.push('/(account)/captured')}/>}
+            : <View style={{gap: tokens.space.medium}}>
+                {unfinishedCount > 0 && <Notice>
+                  {unfinishedCount} captured {unfinishedCount === 1 ? 'item is' : 'items are'} waiting for details.
+                  Nothing has disappeared; open Recently Captured to check.
+                </Notice>}
+                <EmptyLibrary onSave={() => router.push('/(account)/save')}
+                  onCaptured={() => router.push('/(account)/captured')}/>
+              </View>}
       renderItem={({item}) => <MemoryCard
         memory={item} busy={Boolean(working)}
         onOpen={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
