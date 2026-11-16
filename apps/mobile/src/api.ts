@@ -32,6 +32,7 @@ export type Memory = {
   source_url: string | null; extracted_text: string; processing_state: 'queued' | 'processing' | 'ready' | 'metadata_only' | 'failed';
   processing_error: string | null; labels: string[]; collection: string;
   topic_override?: string | null; tags_override?: string[] | null;
+  suggested_topic?: string | null; suggested_topic_reason?: string | null;
 };
 export type MemorySummary = Omit<Memory, 'content'> & {preview: string};
 export type MemoryPage = {items: MemorySummary[]; next_cursor: string | null; sync_cursor: string};
