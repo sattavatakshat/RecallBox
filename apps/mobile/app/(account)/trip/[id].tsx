@@ -120,7 +120,12 @@ export default function TripShortlistScreen(){
           : 'Entered by you'}</Type>
         <View style={{flexDirection:'row',gap:12}}>
           <TextAction label="Move up" disabled={index===0} onPress={()=>setItems(old=>{
-            const copy=[...old];[copy[index-1],copy[index]]=[copy[index],copy[index-1]];return copy;})}/>
+            const copy=[...old];
+            if(index>0 && copy[index] && copy[index-1]) {
+              const current=copy[index]!,previous=copy[index-1]!;
+              copy[index-1]=current;copy[index]=previous;
+            }
+            return copy;})}/>
           <TextAction label="Remove" onPress={()=>setItems(old=>old.filter(p=>p.id!==item.id))}/>
         </View>
       </View>)}
