@@ -1,0 +1,38 @@
+name: RecallBox native Android compile
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/plugins/**'
+      - 'apps/mobile/modules/**'
+      - 'apps/mobile/app.config.ts'
+      - '.github/workflows/recallbox-native-android-compile.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-native-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install exact Expo dependencies
+        working-directory: apps/mobile
+        run: npm ci
+      - name: Generate native Android project and apply config plugins
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --clean --no-install
+      - name: Compile native Android and Kotlin code
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
