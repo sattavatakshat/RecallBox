@@ -23,7 +23,7 @@ async def connect(url: str):
                 raise RuntimeError('Runtime role has migration privileges')
             if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')"):
                 raise RuntimeError('pgvector must be provisioned')
-            if await conn.fetchval('SELECT version_num FROM public.alembic_version') != '0006_shopping_lists':
+            if await conn.fetchval('SELECT version_num FROM public.alembic_version') != '0007_trip_shortlists':
                 raise RuntimeError('Product migration required')
             for table in ('users', 'identities', 'sessions', 'devices', 'memories',
                           'memory_revisions', 'idempotency_keys', 'sync_changes', 'capture_assets', 'ingestion_jobs',

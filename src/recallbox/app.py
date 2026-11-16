@@ -21,6 +21,7 @@ from .sync import router as sync_router
 from .capture import router as capture_router
 from .action_options import router as action_options_router
 from .shopping import router as shopping_router
+from .trips import router as trips_router
 
 logger = logging.getLogger('recallbox')
 
@@ -188,4 +189,5 @@ def create_app():
     app.include_router(capture_router)
     app.include_router(action_options_router)
     app.include_router(shopping_router)
+    app.include_router(trips_router)
     return app
