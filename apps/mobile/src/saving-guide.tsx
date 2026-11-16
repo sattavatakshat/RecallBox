@@ -29,12 +29,12 @@ export function SavingGuide({visible, onClose}: {visible: boolean; onClose: () =
             </Text>
             <Text style={[styles.copy, {color: p.secondaryText}]}>
               Don’t see RecallBox? Copy the link, then use Save something → Paste a link.
-              Add photos and PDFs from Save something inside RecallBox.
+              Add photos and PDFs from Save something or share supported files to RecallBox.
             </Text>
             <Text style={{color: p.secondaryText, fontSize: 14, lineHeight: 21}}>
-              Share availability depends on the app and your installed build. Only web links are
-              supported by the Android share receiver. In-app saves need a connection;
-              an unconfirmed save is not marked Saved.
+              Share availability depends on the app and your installed build. The updated Android
+              receiver supports web links, text, JPG/PNG/WebP images and PDFs up to 8 MiB each.
+              Native shares are encrypted on this device until synced. In-app composer drafts still need a connection to save.
             </Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Got it, close saving guide"
               onPress={onClose} style={({pressed}) => [styles.close, {backgroundColor: p.button,

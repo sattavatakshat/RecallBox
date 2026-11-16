@@ -11,8 +11,9 @@ import {useSession} from './session';
 import {SavingGuide} from './saving-guide';
 
 /** RB-02. This view never manufactures empty, saved, or processing data. */
-export function EmptyLibrary({mode, captures, error, notice, refreshing, onRefresh, onSave, onCaptured}: {
+export function EmptyLibrary({mode, captures, deviceShares, deviceError, error, notice, refreshing, onRefresh, onSave, onCaptured}: {
   mode: LibraryMode; captures: MemorySummary[]; error: string; notice: string;
+  deviceShares: number; deviceError: string;
   refreshing: boolean; onRefresh: () => void; onSave: () => void; onCaptured: () => void;
 }) {
   const p = useBrandTheme();
@@ -33,7 +34,9 @@ export function EmptyLibrary({mode, captures, error, notice, refreshing, onRefre
   const queued = captures.filter(item => item.processing_state === 'queued').length;
   const processing = captures.filter(item => item.processing_state === 'processing').length;
   const status = [queued && `${queued} queued`, processing && `${processing} processing`,
-    failed && `${failed} ${failed === 1 ? 'needs' : 'need'} attention`].filter(Boolean).join(' · ');
+    failed && `${failed} ${failed === 1 ? 'needs' : 'need'} attention`,
+    deviceShares && `${deviceShares} saved on this device`, deviceError && 'Device inbox needs attention']
+    .filter(Boolean).join(' · ');
   const loading = mode === 'loading' || !ready;
 
   return <View style={[styles.root, {backgroundColor: p.background}]}>
@@ -102,7 +105,7 @@ export function EmptyLibrary({mode, captures, error, notice, refreshing, onRefre
               Save a link, screenshot or note.{'\n'}Find it here whenever you need it.
             </Text>
           </View>}
-          {captures.length > 0 && <Pressable accessibilityRole="button"
+          {(captures.length > 0 || deviceShares > 0 || Boolean(deviceError)) && <Pressable accessibilityRole="button"
             accessibilityLabel={`Recently captured. ${status}. Open capture status${failed ? ' and retry options' : ''}`}
             onPress={onCaptured} style={({pressed}) => [styles.captureStatus,
               {borderColor: p.line, backgroundColor: p.surface, opacity: pressed ? 0.7 : 1}]}>

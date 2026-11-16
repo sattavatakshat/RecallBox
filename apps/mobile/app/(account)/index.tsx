@@ -8,9 +8,13 @@ import { Button, Notice, RecoveryState, Type, tokens, usePalette } from '../../s
 import { EmptyLibrary } from '../../src/empty-library';
 import {isUsableMemory, isUnfinishedMemory, libraryMode} from '../../src/library-state';
 import { MemoryCard } from '../../src/memory-card';
+import {useShareInbox} from '../../src/share-inbox';
+import {useSession} from '../../src/session';
 
 export default function Inbox() {
   const store = useMemories();
+  const {account} = useSession();
+  const shareInbox = useShareInbox(account?.id,store.sync);
   const p = usePalette();
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -55,6 +59,7 @@ export default function Inbox() {
   }
   if (mode !== 'populated' && mode !== 'filtered') return <EmptyLibrary
     mode={mode} captures={unfinished} error={store.error} notice={store.notice}
+    deviceShares={shareInbox.items.length} deviceError={shareInbox.error}
     refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
     onSave={() => router.push('/(account)/save')}
     onCaptured={() => router.push('/(account)/captured')}/>;
@@ -152,7 +157,7 @@ export default function Inbox() {
             backgroundColor: p.surface, paddingHorizontal: 12, flexDirection: 'row',
             alignItems: 'center', justifyContent: 'space-between'}}>
           <Type style={{fontSize: 12, fontWeight: '700'}}>Recently captured</Type>
-          <Type muted variant="caption">{unfinishedCount} items  ›</Type>
+          <Type muted variant="caption">{unfinishedCount} processing{shareInbox.items.length ? ` · ${shareInbox.items.length} on device` : ''}  ›</Type>
         </Pressable>}
         {store.hasMore && <Button label="Load earlier notes" busy={store.loading}
         onPress={() => void store.more().catch(() => undefined)}/>}

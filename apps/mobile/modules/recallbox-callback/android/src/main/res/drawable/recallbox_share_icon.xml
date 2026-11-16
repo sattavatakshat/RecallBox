@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+  android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+  <path android:fillColor="@color/recallbox_share_brand"
+    android:pathData="M14,0 L34,0 Q48,0 48,14 L48,34 Q48,48 34,48 L14,48 Q0,48 0,34 L0,14 Q0,0 14,0 Z"/>
+  <path android:fillColor="@android:color/transparent" android:strokeColor="@color/recallbox_share_on_brand"
+    android:strokeWidth="2.3" android:strokeLineJoin="round" android:strokeLineCap="round"
+    android:pathData="M15,34 L15,13 Q15,11 17,11 L31,11 Q33,11 33,13 L33,34 L24,28 Z"/>
+</vector>

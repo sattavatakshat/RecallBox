@@ -17,6 +17,7 @@ class Link(BaseModel):
     model_config = ConfigDict(extra='forbid')
     url: str = Field(min_length=10, max_length=4096)
     title: str = Field(default='', max_length=240)
+    shared_text: str | None = Field(default=None, max_length=100000)
 
 
 async def store(request, who, key, kind, title, content, source=None, asset=None):
@@ -61,7 +62,7 @@ async def save_link(body: Link, request: Request, idempotency_key: UUID = Header
     except ValueError:
         raise Problem(422, 'invalid_public_url') from None
     return await store(request, who, idempotency_key, 'url', body.title or p.hostname,
-                       body.url, source=body.url)
+                       body.shared_text or body.url, source=body.url)
 
 
 @router.post('/uploads', status_code=201)

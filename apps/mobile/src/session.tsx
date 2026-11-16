@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { callbackParams, completeAuth } from './pending-auth';
 import { requireOptionalNativeModule } from 'expo';
 import { Account, api, ApiError, Exchange, Tokens } from './api';
+import {publishShareSession, clearShareSession} from './share-inbox';
 const KEY = 'recallbox.refresh.v1';
 const options = {keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY};
 type Session = { account: Account | null; loading: boolean; message: string; signIn: (data: Exchange) => Promise<void>; logout: () => Promise<void>; retry: () => Promise<void>; authorized: <T>(operation: (access: string) => Promise<T>) => Promise<T> };
@@ -18,8 +19,10 @@ export function SessionProvider({children}: React.PropsWithChildren) {
   const refreshing = useRef<Promise<string> | null>(null);
   async function clear() {
     generation.current += 1;
+    const epoch = generation.current;
     current.current = null; setAccount(null);
     await SecureStore.deleteItemAsync(KEY);
+    await clearShareSession(() => generation.current === epoch);
   }
   async function save(tokens: Tokens) {
     // Persist the replacement BEFORE exposing its access token to the UI.
@@ -75,11 +78,15 @@ export function SessionProvider({children}: React.PropsWithChildren) {
     try {
       if (refreshing.current) await refreshing.current;
       if (!current.current && !(await SecureStore.getItemAsync(KEY))) {
-        if (generation.current === epoch) setAccount(null);
+        if (generation.current === epoch) {setAccount(null);await clearShareSession(() => generation.current === epoch);}
         return;
       }
       const restored = await api.me(await access());
-      if (generation.current === epoch) {setAccount(restored); setMessage('');}
+      if (generation.current === epoch) {
+        if (current.current) await publishShareSession(restored.id,current.current.access,current.current.expires,
+          () => generation.current === epoch);
+        if (generation.current === epoch) {setAccount(restored); setMessage('');}
+      }
     } catch (error) {
       if (generation.current !== epoch) return;
       if (error instanceof ApiError && error.status === 401) {
@@ -113,8 +120,14 @@ export function SessionProvider({children}: React.PropsWithChildren) {
     // Let an older rotation finish before installing another account's token.
     if (refreshing.current) await refreshing.current.catch(() => undefined);
     generation.current += 1;
+    const epoch = generation.current;
     const token = await save(await api.exchange(data));
-    try { setAccount(await api.me(token)); setMessage(''); setLoading(false); }
+    try {
+      const signedIn = await api.me(token);
+      if (current.current) await publishShareSession(signedIn.id,current.current.access,current.current.expires,
+        () => generation.current === epoch);
+      setAccount(signedIn); setMessage(''); setLoading(false);
+    }
     catch (error) { await clear(); throw error; }
   }
   async function logout() {

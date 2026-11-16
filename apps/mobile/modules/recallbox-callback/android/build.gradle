@@ -7,4 +7,12 @@ version = '1.0.0'
 android {
   namespace 'expo.modules.recallboxcallback'
   defaultConfig { versionCode 1; versionName '1.0.0' }
+  sourceSets.main.assets.srcDir("$buildDir/generated/recallbox-brand")
 }
+// Use the exact RB-01 font source without duplicating the asset in the repository.
+def shareBrandFont = tasks.register('copyShareBrandFont', Copy) {
+  from rootProject.file('../assets/welcome/DMSerifDisplay-Regular.ttf')
+  from rootProject.file('../assets/welcome/OFL.txt')
+  into layout.buildDirectory.dir('generated/recallbox-brand')
+}
+tasks.named('preBuild').configure { dependsOn shareBrandFont }

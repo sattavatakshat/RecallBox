@@ -55,15 +55,26 @@ class RecallBoxCallbackModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("RecallBoxCallback")
     AsyncFunction("consumeCallback") { appContext.reactContext?.let { CallbackStore.consume(it) } }
-    AsyncFunction("activateShareAccount") { id: String -> appContext.reactContext?.let { ShareStore.activateAccount(it, id) } ?: false }
-    AsyncFunction("peekShare") { appContext.reactContext?.let { ShareStore.peek(it) } }
-    AsyncFunction("acknowledgeShare") { id: String -> appContext.reactContext?.let { ShareStore.acknowledge(it, id) } ?: false }
-    AsyncFunction("finishShare") {
-      val activity = appContext.currentActivity
-      if (activity?.intent?.action == android.content.Intent.ACTION_SEND) {
-        activity.runOnUiThread { activity.finish() }
-        true
-      } else false
+    Events("shareInboxChanged")
+    val listener: () -> Unit = { sendEvent("shareInboxChanged", emptyMap<String, Any>()) }
+    OnCreate { ShareStore.listeners.add(listener) }
+    OnDestroy { ShareStore.listeners.remove(listener) }
+    AsyncFunction("setShareSession") { origin: String, owner: String, access: String, expires: Double ->
+      val context = requireNotNull(appContext.reactContext)
+      ShareStore.setSession(context,origin,owner,access,expires.toLong())
+      ShareSync.schedule(context); ShareSync.request(context)
+      true
     }
+    AsyncFunction("clearShareSession") {
+      appContext.reactContext?.let { ShareStore.clearSession(it) }
+      true
+    }
+    AsyncFunction("listShares") { owner: String -> appContext.reactContext?.let { ShareStore.list(it,owner).toString() } ?: "[]" }
+    AsyncFunction("retryShares") { owner: String ->
+      val context = requireNotNull(appContext.reactContext)
+      ShareStore.retry(context,owner); ShareSync.schedule(context); ShareSync.request(context)
+      true
+    }
+    AsyncFunction("discardShare") { id: String, owner: String -> appContext.reactContext?.let { ShareStore.discard(it,id,owner) } ?: false }
   }
 }

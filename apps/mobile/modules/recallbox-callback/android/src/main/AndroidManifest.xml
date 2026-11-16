@@ -1,1 +1,31 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <application>
+    <activity android:name="expo.modules.recallboxcallback.ShareActivity"
+      android:exported="true" android:launchMode="singleTop"
+      android:taskAffinity="${applicationId}.share" android:excludeFromRecents="true"
+      android:theme="@style/Theme.RecallBox.Share" android:label="RecallBox"
+      android:icon="@drawable/recallbox_share_icon">
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="text/plain"/>
+        <data android:mimeType="image/jpeg"/>
+        <data android:mimeType="image/png"/>
+        <data android:mimeType="image/webp"/>
+        <data android:mimeType="application/pdf"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.SEND_MULTIPLE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="image/jpeg"/>
+        <data android:mimeType="image/png"/>
+        <data android:mimeType="image/webp"/>
+        <data android:mimeType="application/pdf"/>
+      </intent-filter>
+    </activity>
+    <service android:name="expo.modules.recallboxcallback.ShareSyncJob"
+      android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true"/>
+  </application>
+</manifest>

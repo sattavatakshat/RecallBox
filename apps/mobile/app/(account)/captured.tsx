@@ -3,6 +3,7 @@ import {ActivityIndicator, Linking, View} from 'react-native';
 import {router, useFocusEffect} from 'expo-router';
 import {ApiError, MemorySummary, memoriesApi} from '../../src/api';
 import {useSession} from '../../src/session';
+import {useShareInbox} from '../../src/share-inbox';
 import {Button, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
 type Capture = MemorySummary;
@@ -15,7 +16,7 @@ const unresolved = (item: Capture) => pending(item) || item.processing_state ===
  * No pretend on-device queue and no fabricated progress percentages.
  */
 export default function RecentlyCaptured() {
-  const {authorized} = useSession();
+  const {authorized,account} = useSession();
   const auth=useRef(authorized); auth.current=authorized;
   const p=usePalette();
   const [items,setItems]=useState<Capture[]>([]);
@@ -47,6 +48,8 @@ export default function RecentlyCaptured() {
       }else{setError('Could not refresh captures. Check your connection and try again.');}
     }finally{if(current===generation.current&&!quiet)setLoading(false);}
   },[]);
+  const onShareChange = useCallback(() => {void load(undefined,true);},[load]);
+  const shareInbox = useShareInbox(account?.id,onShareChange);
 
   useFocusEffect(useCallback(()=>{
     void load();
@@ -125,8 +128,14 @@ export default function RecentlyCaptured() {
     </View>
     <View style={{gap:8}}>
       <Type variant="section">On this device</Type>
-      <Notice>An offline outbox is not installed. An upload that never reached the server is not shown as Saved.
-        If your connection failed before confirmation, reopen the original item and retry.</Notice>
+      {!!shareInbox.error && <Notice kind="error">{shareInbox.error}</Notice>}
+      {shareInbox.items.length > 0 && <>
+        <Notice>{shareInbox.items.length} encrypted {shareInbox.items.length === 1 ? 'share is' : 'shares are'} saved on this device and waiting for server confirmation.</Notice>
+        <TextAction label="View device shares and retry" onPress={() => router.push('/(account)/incoming-share')}/>
+      </>}
+      <Notice>{shareInbox.supported
+        ? 'Android shares have an encrypted device inbox. In-app note/link/file composer drafts are separate and are not a durable offline outbox.'
+        : 'This installed build needs a native update for the encrypted share inbox. An unconfirmed in-app upload is not shown as Saved.'}</Notice>
     </View>
     {loading&&<ActivityIndicator accessibilityLabel="Loading captured items" color={p.accent}/>}
     {!!cursor&&!loading&&<Button label="Show older captures" variant="secondary"
