@@ -25,6 +25,8 @@ export default function MemoryDetail() {
   const [imageSource,setImageSource] = useState<ImageURISource | null>(null);
   const [imageError,setImageError] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [showSourceDetails, setShowSourceDetails] = useState(false);
   const opening = useRef(false);
   const dirty = Boolean(base && (title !== base.title || content !== base.content || collection !== base.collection));
   const release = usePreventRemove(dirty && !leaving, ({repeat}) => {
@@ -41,14 +43,15 @@ export default function MemoryDetail() {
     if (cause instanceof ApiError && cause.code === 'version_conflict' && cause.current) setConflict(cause.current);
     if (cause instanceof ApiError && (cause.status === 404 || cause.status === 410)) setUnavailable(true);
   }
-  async function load() {
+  async function load(background = false) {
     if (!id || opening.current) return;
-    opening.current = true; setBusy(true); setError('');
+    opening.current = true;
+    if (!background) {setBusy(true); setError('');}
     try {
       const note = await store.get(id);
       setBase(note); setTitle(note.title); setContent(note.content); setCollection(note.collection); setUnavailable(false);
-    } catch (cause) { failed(cause); }
-    finally { opening.current = false; setBusy(false); }
+    } catch (cause) { if (!background) failed(cause); }
+    finally { opening.current = false; if (!background) setBusy(false); }
   }
   useFocusEffect(useCallback(() => { if (!base) void load(); }, [id, base, store.get]));
   useEffect(() => {
@@ -61,10 +64,11 @@ export default function MemoryDetail() {
     return () => {active=false;};
   }, [base?.id,base?.kind,base?.processing_state]);
   useEffect(() => {
-    if (!base || !['queued','processing'].includes(base.processing_state) || dirty) return;
-    const timer = setInterval(() => void load(), 4000);
+    if (!base || !['queued','processing'].includes(base.processing_state) || dirty || editing) return;
+    // Quiet polling must not disable a reader's controls or flash a loader.
+    const timer = setInterval(() => void load(true), 4000);
     return () => clearInterval(timer);
-  }, [base?.processing_state, dirty, id]);
+  }, [base?.processing_state, dirty, editing, id]);
   async function original() {
     if(!base || busy) return;
     setBusy(true); setError('');
@@ -105,6 +109,7 @@ export default function MemoryDetail() {
       const note = await store.edit(id, {expected_version: base.version, ...fields});
       setBase(note); setConflict(null);
       if ('content' in fields || !dirty) { setTitle(note.title); setContent(note.content); setCollection(note.collection); }
+      if ('title' in fields || 'content' in fields || 'collection' in fields) setEditing(false);
       setNotice('Saved to RecallBox.');
     } catch (cause) { failed(cause); }
     finally { setBusy(false); }
@@ -122,7 +127,7 @@ export default function MemoryDetail() {
     ]);
   }
   async function openOriginal() {
-    if (!base || base.kind !== 'link' || !/^https?:\/\/\S+$/i.test(base.content)) {
+    if (!base || (base.kind !== 'link' && base.kind !== 'url') || !/^https?:\/\/\S+$/i.test(base.content)) {
       setError('This saved address cannot be opened.');
       return;
     }
@@ -133,53 +138,128 @@ export default function MemoryDetail() {
     }
   }
   const remote = store.items.find(note => note.id === id);
+  const hasSource = Boolean(base && (base.source_url || ((base.kind === 'link' || base.kind === 'url') && base.content)));
+  const isPending = base?.processing_state === 'queued' || base?.processing_state === 'processing';
+  const hasReadableContent = Boolean(base && (base.extracted_text.trim() || (base.kind === 'note' && base.content.trim())));
   return <Screen>
-    <TextAction label="Back to inbox" onPress={() => router.replace('/(account)')}/>
-    <Type>{base?.kind?.toUpperCase() || 'YOUR MEMORY'}</Type><Type title>{base ? (base.title || 'A little thought.') : unavailable ? 'Memory unavailable.' : 'Opening your memory…'}</Type>
-    {!!notice && <Notice>{notice}</Notice>}{!!error && <Notice>{error}</Notice>}
+    <TextAction label="Back to Library" onPress={() => router.replace('/(account)')}/>
+    <Type variant="eyebrow" muted>
+      {base?.kind === 'note' ? 'YOUR NOTE' : base?.kind === 'image' ? 'YOUR PHOTO'
+        : base?.kind === 'pdf' ? 'YOUR DOCUMENT' : 'SAVED MEMORY'}
+    </Type>
+    <Type title>{base
+      ? (base.title || (base.kind === 'note' ? 'A little thought.' : 'Something worth keeping.'))
+      : unavailable ? 'Memory unavailable.' : 'Opening your memory…'}</Type>
+    {base && <Type muted variant="caption">
+      Saved {new Date(base.created_at).toLocaleDateString(undefined, {day:'numeric',month:'long',year:'numeric'})}
+    </Type>}
+    {!!notice && <Notice kind="success">{notice}</Notice>}
+    {!!error && <Notice kind="error">{error}</Notice>}
     {!base && !busy && !unavailable && <Button label="Try again" onPress={() => void load()}/>}
     {base && <>
-      <Type muted>Saved {new Date(base.created_at).toLocaleDateString()} · Version {base.version}</Type>
-      <Notice>{base.processing_state.replace('_',' ')}{base.processing_error ? ` · ${base.processing_error}` : ''}</Notice>
-      {!!base.labels.length && <Type muted>{base.labels.join(' · ')}</Type>}
-      {!!base.source_url && <TextAction label="Open original source" onPress={() => void Linking.openURL(base.source_url!)}/>}
-      {imageSource && !imageError && <Image accessibilityLabel="Saved image" source={imageSource} resizeMode="contain" style={{width:'100%',height:280,borderRadius:18}} onError={() => setImageError(true)}/>}
-      {imageError && <Notice>Preview could not load. Open the saved original below.</Notice>}
-      {['image','pdf'].includes(base.kind) && <Button label="Open or share saved original" busy={busy} onPress={() => void original()}/>}
-      {['failed','metadata_only'].includes(base.processing_state) && <TextAction label="Retry processing" disabled={busy} onPress={() => void retryProcessing()}/>}
-      {!!base.extracted_text && <View style={{gap: 12}}><Type>Saved source content</Type><Type muted>{base.extracted_text.slice(0,6000)}</Type>{base.extracted_text.length>6000 && <Notice>Showing the first 6,000 characters. The captured text is retained for search.</Notice>}</View>}
+      {!!base.labels.length && <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+        {base.labels.slice(0,5).map(label => <View key={label} style={{paddingVertical:6,paddingHorizontal:11,
+          borderRadius:16,backgroundColor:'#E1E9DA'}}>
+          <Type style={{fontSize:12,color:'#284D3B'}}>{label}</Type>
+        </View>)}
+      </View>}
+      {isPending && <Notice>
+        Your source was saved. It's still being processed and is available in Recently Captured.
+      </Notice>}
+      {base.processing_state === 'failed' && <Notice kind="error">
+        We kept your source, but couldn't finish processing it. Retry below.
+      </Notice>}
+      {imageSource && !imageError && <Image accessibilityLabel="Saved image" source={imageSource}
+        resizeMode="contain" style={{width:'100%',height:280,borderRadius:18}}
+        onError={() => setImageError(true)}/>}
+      {imageError && <Notice>Preview unavailable. You can still open the saved original.</Notice>}
+      {base.kind === 'note' && !editing && <Type style={{lineHeight:27}}>
+        {base.content || 'No note text yet.'}
+      </Type>}
+      {base.kind !== 'note' && !!base.extracted_text?.trim() && <View style={{gap:12}}>
+        <Type variant="section">From this source</Type>
+        <Type style={{lineHeight:26}}>{base.extracted_text.slice(0,6000)}</Type>
+        {base.extracted_text.length > 6000 &&
+          <Notice>Showing an excerpt. The full available text remains searchable.</Notice>}
+      </View>}
+      {base.kind !== 'note' && !hasReadableContent && !isPending && <Notice>
+        {base.processing_state === 'metadata_only'
+          ? 'This source is available as a saved link or file. More content was not accessible.'
+          : 'There is no text preview available for this source.'}
+      </Notice>}
+      {hasSource && <Button variant="secondary" label="Open original source"
+        disabled={busy || unavailable} onPress={() => {
+          if (base.source_url) {
+            void Linking.openURL(base.source_url).catch(() => setError('Unable to open the original source.'));
+          } else void openOriginal();
+        }}/>}
+      {['image','pdf'].includes(base.kind) &&
+        <Button label="Open or share saved original" busy={busy} onPress={() => void original()}/>}
+      {['failed','metadata_only'].includes(base.processing_state) &&
+        <TextAction label="Retry getting details" disabled={busy}
+          onPress={() => void retryProcessing()}/>}
       {remote && remote.version > base.version && <>
-        <Notice>This note has changed on another device. Your draft is unchanged.</Notice>
+        <Notice>This memory changed on another device. Your draft remains here.</Notice>
         <TextAction label="Compare with latest" disabled={busy} onPress={() => void compare()}/>
       </>}
-      {unavailable && <Notice>This note is no longer available. Your draft stays here until you leave this screen.</Notice>}
-      <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
-      <Input label="Collection" value={collection} onChangeText={setCollection} maxLength={80} editable={!busy} placeholder="e.g. Travel, Reading, Ideas"/>
-      <Input label={base.kind === 'link' ? 'Original URL' : 'Note'} value={content} onChangeText={setContent} maxLength={base.kind === 'link' ? 4096 : 100000} autoCapitalize={base.kind === 'link' ? 'none' : 'sentences'} autoCorrect={base.kind !== 'link'} multiline
-        textAlignVertical="top" style={{minHeight: 240}} editable={!busy}/>
-      {conflict && <View style={{gap: 16}}>
-        <Type>Latest saved version ({conflict.version})</Type><Type>{conflict.title || 'Untitled note'}</Type><Type muted>{conflict.content}</Type>
-        <Notice>Your draft remains above. Review and merge these changes before saving.</Notice>
-        <Button label="Keep my draft and use this version as its base" disabled={busy} onPress={() => {
-          setBase(conflict); setConflict(null); setError(''); setNotice('Draft kept. Merge any changes above, then save.');
-        }}/>
-        <TextAction label="Replace my draft with the latest note" disabled={busy} onPress={() => Alert.alert('Replace your draft?', 'Your current unsaved edits will be discarded.', [
-          {text: 'Keep draft', style: 'cancel'}, {text: 'Use latest', onPress: () => {
-          setBase(conflict); setTitle(conflict.title); setContent(conflict.content); setCollection(conflict.collection); setConflict(null); setError('');
-          }},
-        ])}/>
-      </View>}
-      {base.kind === 'link' && <Button label="Open original link" disabled={busy || unavailable}
-        onPress={() => void openOriginal()}/>}
-      <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
-        onPress={() => router.push({pathname: '/(account)/add-to-collection', params: {memoryId: id}})}/>
-      <Button label="Save changes" busy={busy} disabled={!dirty || !content.trim() || unavailable || Boolean(conflict)}
-        onPress={() => void update({title, content, collection})}/>
-      <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 20}}>
-        <TextAction label={base.starred ? 'Unstar' : 'Star'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({starred: !base.starred})}/>
-        <TextAction label={base.archived ? 'Move to inbox' : 'Archive note'} disabled={busy || unavailable || Boolean(conflict)} onPress={() => void update({archived: !base.archived})}/>
-        <TextAction label={base.kind === 'link' ? 'Delete saved link' : 'Delete note'} disabled={busy || unavailable} onPress={confirmDelete}/>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+        <TextAction label={base.starred ? '★ Starred' : '☆ Star'} disabled={busy || unavailable || Boolean(conflict)}
+          onPress={() => void update({starred: !base.starred})}/>
+        <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
+          onPress={() => router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}})}/>
+        <TextAction label={editing ? 'Editing' : 'Edit'} disabled={busy || unavailable}
+          onPress={() => setEditing(true)}/>
       </View>
+      {editing && <View style={{gap:16}}>
+        <Type variant="section">Edit memory</Type>
+        <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
+        <Input label="Collection (optional)" value={collection} onChangeText={setCollection}
+          maxLength={80} editable={!busy} placeholder="Travel, Reading, Ideas"/>
+        {(base.kind === 'note' || base.kind === 'link' || base.kind === 'url') &&
+          <Input label={base.kind === 'note' ? 'Note' : 'Original URL'} value={content}
+            onChangeText={setContent} maxLength={base.kind === 'note' ? 100000 : 4096}
+            autoCapitalize={base.kind === 'note' ? 'sentences' : 'none'}
+            autoCorrect={base.kind === 'note'} multiline
+            textAlignVertical="top" style={{minHeight:base.kind === 'note' ? 220 : 70}} editable={!busy}/>}
+        {conflict && <View style={{gap:12}}>
+          <Type variant="section">A newer version exists</Type>
+          <Type muted>{conflict.title || 'Untitled memory'}</Type>
+          <Notice>Your draft remains above. Review before saving.</Notice>
+          <Button variant="secondary" label="Use newer version as my base" disabled={busy}
+            onPress={() => {setBase(conflict);setConflict(null);setError('');}}/>
+          <TextAction label="Discard draft and load latest" disabled={busy} onPress={() =>
+            Alert.alert('Discard your draft?', 'Your unsaved changes will be lost.', [
+              {text:'Keep draft',style:'cancel'},
+              {text:'Use latest',onPress:()=>{setBase(conflict);setTitle(conflict.title);
+                setContent(conflict.content);setCollection(conflict.collection);setConflict(null);setError('');}},
+            ])}/>
+        </View>}
+        <Button label="Save changes" busy={busy}
+          disabled={!dirty || unavailable || Boolean(conflict)}
+          onPress={() => void update({title, content, collection})}/>
+        <TextAction label="Cancel editing" disabled={busy} onPress={() => {
+          if (dirty) {
+            Alert.alert('Discard changes?', 'Your unsaved edits will be lost.',[
+              {text:'Keep editing',style:'cancel'},
+              {text:'Discard',style:'destructive',onPress:()=>{
+                setTitle(base.title);setContent(base.content);setCollection(base.collection);setEditing(false);}},
+            ]);
+          } else setEditing(false);
+        }}/>
+      </View>}
+      {unavailable && <Notice>This memory is unavailable. Your draft has not been discarded.</Notice>}
+      <TextAction label={showSourceDetails ? 'Hide source details' : 'Source details'}
+        onPress={() => setShowSourceDetails(current => !current)}/>
+      {showSourceDetails && <View style={{gap:8}}>
+        <Type muted variant="caption">Type: {base.kind}</Type>
+        <Type muted variant="caption">Processing: {base.processing_state.replace('_',' ')}</Type>
+        <Type muted variant="caption">Version: {base.version}</Type>
+        {!!base.processing_error && <Notice kind="error">{base.processing_error}</Notice>}
+      </View>}
+      <TextAction label={base.archived ? 'Restore from archive' : 'Archive memory'}
+        disabled={busy || unavailable || Boolean(conflict)}
+        onPress={() => void update({archived: !base.archived})}/>
+      <TextAction label="Delete memory" disabled={busy || unavailable} onPress={confirmDelete}/>
     </>}
   </Screen>;
 }
