@@ -76,7 +76,7 @@ jobs:
           mem_a='10000000-0000-0000-0000-000000000001'
           mem_b='10000000-0000-0000-0000-000000000002'
           with psycopg.connect(root) as conn:
-              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0008_learning_queue'
+              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0009_reminders'
               assert conn.execute('SELECT count(*) FROM memories').fetchone()[0] == 2
           with psycopg.connect(api) as conn:
               conn.execute('SELECT set_config(%s,%s,true)',('app.user_id',owner_a))
@@ -95,7 +95,7 @@ jobs:
               conn.execute("""INSERT INTO learning_items(id,owner_id,source_memory_id,sort_order)
                 VALUES(%s,%s,%s,1000)""",
                 ('40000000-0000-0000-0000-000000000001',owner_a,mem_a))
-              # RLS must protect the second account even with a known UUID.
+              conn.execute("""INSERT INTO reminders(id,owner_id,source_memory_id,request_key,due_at,time_zone)\n                VALUES(%s,%s,%s,%s,clock_timestamp()+interval '1 day','Asia/Kolkata')""",\n                ('50000000-0000-0000-0000-000000000001',owner_a,mem_a,\n                 '60000000-0000-0000-0000-000000000001'))\n              # RLS must protect the second account even with a known UUID.
               assert conn.execute(
                   'UPDATE memories SET topic_override=%s WHERE id=%s RETURNING id',
                   ('Ideas',mem_b)).fetchone() is None
@@ -105,7 +105,7 @@ jobs:
               assert ids=={mem_b},ids
               assert conn.execute('SELECT count(*) FROM shopping_lists').fetchone()[0] == 0
               assert conn.execute('SELECT count(*) FROM trip_shortlists').fetchone()[0] == 0
-              assert conn.execute('SELECT count(*) FROM learning_items').fetchone()[0] == 0
+              assert conn.execute('SELECT count(*) FROM learning_items').fetchone()[0] == 0\n              assert conn.execute('SELECT count(*) FROM reminders').fetchone()[0] == 0\n              assert conn.execute("""UPDATE reminders SET status='completed' WHERE id=%s RETURNING id""",\n                ('50000000-0000-0000-0000-000000000001',)).fetchone() is None
               assert conn.execute("""UPDATE learning_items SET status='completed'
                 WHERE id=%s RETURNING id""",
                 ('40000000-0000-0000-0000-000000000001',)).fetchone() is None
