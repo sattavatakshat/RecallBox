@@ -20,6 +20,7 @@ export default function OrganizeMemory() {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [leaving,setLeaving]=useState(false);
+  const chosenTopic=topic==='Uncategorized'?null:(topic??memory?.suggested_topic??null);
   const dirty=Boolean(memory && (topic!==(memory.topic_override??null)||
     !equal(tags,memory.tags_override)));
   const release=usePreventRemove(dirty&&!leaving,({repeat})=>{
@@ -77,11 +78,20 @@ export default function OrganizeMemory() {
       <Type variant="section">{memory.title||'Saved memory'}</Type>
       <Type variant="label">Primary topic (optional)</Type>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        <FilterChip label="Not categorized" selected={topic===null} onPress={()=>setTopic(null)}/>
-        {TOPICS.map(name=><FilterChip key={name} label={name} selected={topic===name}
+        <FilterChip label="Not categorized" selected={chosenTopic===null}
+          onPress={()=>setTopic(memory.suggested_topic?'Uncategorized':null)}/>
+        {TOPICS.map(name=><FilterChip key={name} label={name} selected={chosenTopic===name}
           onPress={()=>setTopic(name)}/>)}
       </View>
-      <Type muted variant="caption">Topics here are selected by you, not guessed from a reel or URL.</Type>
+      {memory.suggested_topic && <Notice>
+        Suggested: {memory.suggested_topic}. {memory.suggested_topic_reason ||
+          'Based on available source text.'} You can change it.
+      </Notice>}
+      {!memory.suggested_topic && <Type muted variant="caption">
+        No reliable category suggestion was found. Pick one if you like.
+      </Type>}
+      {topic!==null && <TextAction label="Use source suggestion"
+        onPress={()=>setTopic(null)}/>
       <Type variant="label">Personal tags</Type>
       {tags?.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
         {tags.map(label=><Pressable key={label} accessibilityRole="button"
