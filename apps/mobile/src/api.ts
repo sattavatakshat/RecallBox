@@ -116,3 +116,18 @@ export const shoppingApi = {
     title?:string;items?:ShoppingItem[]})=>request<ShoppingList>(
     `/shopping-lists/${encodeURIComponent(id)}`,'PATCH',body,access),
 };
+
+export type TripItem = {id:string;label:string;note:string;day:number|null;
+  source_memory_id:string|null;origin:'source'|'user'};
+export type TripShortlist = {id:string;source_memory_id:string;name:string;
+  source_title:string;source_url:string|null;start_date:string|null;end_date:string|null;
+  items:TripItem[];version:number;created_at:string;updated_at:string};
+export const tripApi = {
+  create:(access:string,memoryId:string)=>request<TripShortlist>(
+    `/memories/${encodeURIComponent(memoryId)}/trip-shortlist`,'POST',undefined,access),
+  get:(access:string,id:string)=>request<TripShortlist>(
+    `/trip-shortlists/${encodeURIComponent(id)}`,'GET',undefined,access),
+  edit:(access:string,id:string,body:{expected_version:number;name?:string;
+    start_date?:string|null;end_date?:string|null;items?:TripItem[]})=>
+    request<TripShortlist>(`/trip-shortlists/${encodeURIComponent(id)}`,'PATCH',body,access),
+};
