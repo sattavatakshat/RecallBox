@@ -12,7 +12,7 @@ export default function Protected() {
   const leaf = segments.length ? String(segments[segments.length - 1]) : '';
   // The primary bar belongs to destinations, not editors, memory details or modals.
   const isHome = leaf === '(account)' || leaf === 'index';
-  const isSearch = leaf === 'search';
+  const isSearch = leaf === 'search' || leaf === 'results';
   const isCollections = leaf === 'collections';
   const showTabs = segments.length <= 2 && (isHome || isSearch || isCollections);
 
