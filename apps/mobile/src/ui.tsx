@@ -128,7 +128,8 @@ export function Notice({children, kind = 'info'}: React.PropsWithChildren<{
   kind?: 'info' | 'error' | 'success';
 }>) {
   const p = usePalette();
-  return <View accessibilityLiveRegion="polite">
+  return <View accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'}
+    accessibilityRole={kind === 'error' ? 'alert' : undefined}>
     <Type variant="caption" style={{color: kind === 'error' ? p.danger : kind === 'success' ? p.success : p.muted}}>
       {children}
     </Type>
@@ -196,4 +197,16 @@ export function Divider() {
   const p = usePalette();
   return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
     style={{height: 1, backgroundColor: p.line}}/>;
+}
+
+
+/** A truthful error/empty state, with no fake saved data or endless spinner. */
+export function RecoveryState({title,description,onRetry,retryLabel='Try again'}: {
+  title: string; description: string; onRetry?: () => void; retryLabel?: string;
+}) {
+  return <View style={{paddingVertical: tokens.space.section,gap:tokens.space.medium}}>
+    <Type variant="section">{title}</Type>
+    <Type muted>{description}</Type>
+    {!!onRetry && <Button label={retryLabel} variant="secondary" onPress={onRetry}/>}
+  </View>;
 }
