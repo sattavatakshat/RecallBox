@@ -95,8 +95,10 @@ export function BottomNavigation({active}: {active: Destination}) {
         shadowRadius: 16, shadowOffset: {width: 0, height: 6},
         opacity: pressed ? 0.8 : 1,
       })}>
-      <Text style={{color: '#FFFFFF', fontSize: 29, lineHeight: 33,
-        fontWeight: '300', marginTop: -2}}>+</Text>
+      <View accessible={false} style={{width: 25, height: 25, alignItems: 'center', justifyContent: 'center'}}>
+        <View style={{position: 'absolute', width: 24, height: 2, backgroundColor: '#FFFFFF', borderRadius: 1}}/>
+        <View style={{position: 'absolute', height: 24, width: 2, backgroundColor: '#FFFFFF', borderRadius: 1}}/>
+      </View>
     </Pressable>
   </>;
 }
