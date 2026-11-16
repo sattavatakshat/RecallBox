@@ -82,9 +82,13 @@ export default function CollectionScreen() {
 
   return <Screen>
     <TextAction label="Back to collections" onPress={() => router.replace('/(account)/collections')}/>
-    <Type>RECALLBOX / YOUR GROUP</Type>
+    <Type variant="eyebrow" muted>YOUR COLLECTION</Type>
     <Type title>{data?.name ?? 'Your collection.'}</Type>
-    <Type muted>Memories you chose to keep together. No automated folder decisions.</Type>
+    <Type muted>Memories you chose to keep together, without automatic folders.</Type>
+    {data && <Button label="+ Add saved items" variant="secondary" disabled={busy}
+      onPress={() => router.push({
+        pathname: '/(account)/add-to-collection', params: {collectionId: id},
+      })}/>}
     {!!error && <Notice>{error}</Notice>}
     {!!notice && <Notice>{notice}</Notice>}
     {loading && <ActivityIndicator accessibilityLabel="Opening collection" color={p.ink}/>}
@@ -96,15 +100,25 @@ export default function CollectionScreen() {
           onPress={() => void rename()}/>
         <TextAction label="Cancel rename" onPress={() => {setRenaming(false); setDraftName(data.name);}}/>
       </> : <TextAction label="Rename collection" onPress={() => setRenaming(true)} disabled={busy}/>}
-      <Type>RECENTLY ADDED</Type>
+      <Type variant="section">{data.items.length} saved {data.items.length === 1 ? 'item' : 'items'}</Type>
       {data.items.length === 0 && <Notice>Nothing here yet. Open a saved note or link, then choose Add to collection.</Notice>}
       {data.items.map(item => <View key={item.id} style={{borderBottomWidth: 1,
         borderColor: p.line, paddingVertical: 16, gap: 8}}>
         <Pressable accessibilityRole="button"
           accessibilityLabel={`Open ${item.title || 'memory'}`}
-          onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
-          <Type>{item.title || (item.kind === 'link' ? 'Saved link' : 'Untitled note')}</Type>
-          <Type muted>{item.preview}</Type>
+          onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
+          style={({pressed}) => ({minHeight:64,flexDirection:'row',alignItems:'center',gap:12,
+            opacity:pressed ? 0.7 : 1})}>
+          <View style={{height:52,width:52,borderRadius:12,backgroundColor:p.surfaceMuted,
+            alignItems:'center',justifyContent:'center'}}>
+            <Type>{item.kind === 'note' ? '≡' : item.kind === 'pdf' ? '▤' :
+              item.kind === 'image' ? '▧' : '↗'}</Type>
+          </View>
+          <View style={{flex:1,gap:5}}>
+            <Type variant="label" numberOfLines={2}>{item.title ||
+              (item.kind === 'link' ? 'Saved link' : 'Untitled note')}</Type>
+            {!!item.preview && <Type muted variant="caption" numberOfLines={2}>{item.preview}</Type>}
+          </View>
         </Pressable>
         <TextAction label="Remove from collection" disabled={busy}
           onPress={() => removeItem(item.id, item.title || 'This memory')}/>
