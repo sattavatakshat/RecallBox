@@ -171,3 +171,23 @@ async def remove_from_collection(collection_id: UUID, memory_id: UUID, request: 
             SET removed_at=clock_timestamp()
             WHERE owner_id=$1 AND collection_id=$2 AND memory_id=$3 AND removed_at IS NULL''',
             owner, collection_id, memory_id)
+
+
+@router.get('/memories/{memory_id}/collections')
+async def collections_for_memory(memory_id: UUID, request: Request,
+                                 who=Depends(principal)):
+    """Get real active memberships for one owner-scoped saved memory."""
+    owner = who[0]
+    async with owned(request.app.state.pool, owner, readonly=True) as conn:
+        exists = await conn.fetchval(
+            'SELECT id FROM memories WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL',
+            memory_id, owner
+        )
+        if exists is None:
+            raise Problem(404, 'memory_not_found')
+        rows = await conn.fetch('''SELECT c.id,c.name,c.version,c.created_at,c.updated_at
+            FROM collection_items ci
+            JOIN collections c ON c.id=ci.collection_id AND c.owner_id=ci.owner_id
+            WHERE ci.owner_id=$1 AND ci.memory_id=$2 AND ci.removed_at IS NULL
+              AND c.deleted_at IS NULL ORDER BY c.name,c.id''', owner, memory_id)
+        return {'items': [format_collection(row) for row in rows]}
