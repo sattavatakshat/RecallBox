@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ApiError, CollectionDetail, collectionsApi } from '../../../src/api';
+import { ApiError, CollectionDetail, collectionsApi, tripApi } from '../../../src/api';
 import { useSession } from '../../../src/session';
 import { Button, Input, Notice, Screen, TextAction, Type, usePalette } from '../../../src/ui';
 
@@ -17,6 +17,7 @@ export default function CollectionScreen() {
   const [notice, setNotice] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState('');
+  const [tripBusy, setTripBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -80,10 +81,24 @@ export default function CollectionScreen() {
     ]);
   }
 
+  async function startTrip(memoryId: string) {
+    if (tripBusy || busy) return;
+    setTripBusy(true); setError('');
+    try {
+      // The backend checks actual saved-source evidence before creating a trip.
+      const created = await auth.current(access => tripApi.create(access, memoryId));
+      router.push({pathname:'/(account)/trip/[id]', params:{id:created.id}});
+    } catch (cause) {
+      setError(cause instanceof ApiError && cause.code === 'insufficient_travel_evidence'
+        ? 'This saved item does not contain enough confirmed travel evidence for a shortlist.'
+        : 'Could not confirm trip creation. Your saved item is unchanged.');
+    } finally {setTripBusy(false);}
+  }
+
   return <Screen>
     <TextAction label="Back to collections" onPress={() => router.replace('/(account)/collections')}/>
     <Type variant="eyebrow" muted>YOUR COLLECTION</Type>
-    <Type title>{data?.name ?? 'Your collection.'}</Type>
+    <Type title>{data?.name ? data.name + '.' : 'Your collection.'}</Type>
     <Type muted>Memories you chose to keep together, without automatic folders.</Type>
     {data && <Button label="+ Add saved items" variant="secondary" disabled={busy}
       onPress={() => router.push({
@@ -123,6 +138,12 @@ export default function CollectionScreen() {
         <TextAction label="Remove from collection" disabled={busy}
           onPress={() => removeItem(item.id, item.title || 'This memory')}/>
       </View>)}
+      {data.items.filter(item => /travel|trip|places/i.test([item.topic_override,item.suggested_topic,item.title].filter(Boolean).join(' '))).slice(0,1).map(item =>
+        <View key={'trip-'+item.id} style={{gap:8,marginTop:12}}>
+          <Type muted variant="caption">From a saved travel source</Type>
+          <Button label="Start a trip shortlist" busy={tripBusy} disabled={busy}
+            onPress={() => void startTrip(item.id)}/>
+        </View>)}
       {data.has_more && <Notice>Showing the newest 100 items. Older items remain saved in this collection.</Notice>}
       <TextAction label="Remove this collection" disabled={busy} onPress={removeCollection}/>
     </>}
