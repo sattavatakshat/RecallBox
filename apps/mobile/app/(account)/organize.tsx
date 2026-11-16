@@ -61,9 +61,14 @@ export default function OrganizeMemory() {
         topic_override:topic,tags_override:tags});
       setLeaving(true);release();router.back();
     }catch(cause){
-      setError(cause instanceof ApiError && cause.code==='version_conflict'
-        ? 'This memory changed elsewhere. Your choices remain here; review the latest saved version.'
-        : 'Save was not confirmed. Your choices are still on this screen.');
+      if(cause instanceof ApiError && cause.code==='version_conflict' && cause.current) {
+        // Preserve the draft, but show exactly what will be saved against the
+        // newly fetched version. A second Save is an explicit user decision.
+        setMemory(cause.current);
+        setError('This memory changed elsewhere. Your choices are still here. Review them and tap Save again.');
+      } else {
+        setError('Save was not confirmed. Your choices are still on this screen.');
+      }
     }finally{setBusy(false);}
   }
   return <Screen compact>
