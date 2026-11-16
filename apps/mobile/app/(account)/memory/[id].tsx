@@ -233,6 +233,8 @@ export default function MemoryDetail() {
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
         <TextAction label={base.starred ? '★ Starred' : '☆ Star'} disabled={busy || unavailable || Boolean(conflict)}
           onPress={() => void update({starred: !base.starred})}/>
+        <TextAction label="Organize" disabled={busy || unavailable || Boolean(conflict) || dirty}
+          onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/>
         <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
           onPress={() => router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}})}/>
         <TextAction label={editing ? 'Editing' : 'Edit'} disabled={busy || unavailable || editing}
