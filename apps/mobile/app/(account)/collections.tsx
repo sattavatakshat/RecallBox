@@ -1,5 +1,5 @@
 import React, {useCallback, useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, View} from 'react-native';
 import {router, useFocusEffect} from 'expo-router';
 import {ApiError, Collection, collectionsApi} from '../../src/api';
 import {useSession} from '../../src/session';
@@ -46,10 +46,9 @@ export default function Collections() {
   }
 
   return <Screen compact>
-    <Type variant="eyebrow" muted>YOUR PERSONAL SPACE</Type>
     <Type title>Collections.</Type>
-    <Type muted>The things you've gathered for a reason. Make your own groups without filing every save.</Type>
-    <Button label={creating ? 'Close new collection' : '+ New collection'}
+    <Type muted>The things you have gathered for a reason.</Type>
+    <Button label={creating ? 'Close new collection' : '＋ New collection'}
       variant={creating ? 'secondary' : 'primary'}
       onPress={()=>{setCreating(current=>!current);setError('');}}/>
     {creating && <View style={{gap:12,padding:16,borderRadius:16,backgroundColor:p.surface}}>
@@ -83,7 +82,10 @@ export default function Collections() {
       <View importantForAccessibility="no-hide-descendants" style={{
         width:64,height:64,borderRadius:12,alignItems:'center',justifyContent:'center',
         backgroundColor:p.surfaceMuted}}>
-        <Text style={{fontSize:26,color:p.accent}}>▤</Text>
+        <View style={{width:24,height:19,alignItems:'center',justifyContent:'center'}}>
+          <View style={{position:'absolute',top:1,width:19,height:9,borderWidth:2,borderColor:p.accent,borderRadius:3,transform:[{rotate:'-9deg'}]}}/>
+          <View style={{position:'absolute',top:7,width:21,height:11,borderWidth:2,borderColor:p.accent,borderRadius:3,backgroundColor:p.surfaceMuted}}/>
+        </View>
       </View>
       <View style={{flex:1,gap:4}}>
         <Type variant="label" numberOfLines={2}>{item.name}</Type>
@@ -92,6 +94,6 @@ export default function Collections() {
       <Type muted>›</Type>
     </Pressable>)}
     {hasMore && <Notice>Showing the newest 100 collections. Your older collections remain saved.</Notice>}
-    <Type muted variant="caption">Collections are created by you. RecallBox's topic suggestions never create folders automatically.</Type>
+    <Type muted variant="caption">These are intentional, user-created collections. Topic filters in Library are not permanent folders.</Type>
   </Screen>;
 }
