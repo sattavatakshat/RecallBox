@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { MemorySummary } from '../../src/api';
 import { errorMessage, useMemories } from '../../src/memories';
-import { Button, FilterChip, Notice, TextAction, Type, tokens, usePalette } from '../../src/ui';
+import { Button, FilterChip, Notice, RecoveryState, TextAction, Type, tokens, usePalette } from '../../src/ui';
 import { EmptyLibrary } from '../../src/empty-library';
 import { MemoryCard } from '../../src/memory-card';
 
@@ -71,17 +71,15 @@ export default function Inbox() {
           label={unfinishedCount ? `Recently captured · ${unfinishedCount} unfinished` : 'Recently captured'}
           onPress={() => router.push('/(account)/captured')}/>}
         {usable.length > 0 && <Type variant="section">{store.archived ? 'Archived' : store.starredOnly ? 'Starred' : topic || 'Recently saved'}</Type>}
-        {(store.error || error) && <Notice>{store.error || error}</Notice>}
+        {(store.error || error) && <Notice kind="error">{store.error || error}</Notice>}
         {!!store.notice && <Notice>{store.notice}</Notice>}
       </View>}
       ListEmptyComponent={store.loading
         ? <ActivityIndicator accessibilityLabel="Loading your memories" color={p.ink}/>
         : store.error
-          ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
-              <Type variant="section">Your library couldn't load.</Type>
-              <Type muted>Check your connection and try again. Your existing saves haven't been deleted.</Type>
-              <Button label="Try again" onPress={() => void store.refresh().catch(() => undefined)}/>
-            </View>
+          ? <RecoveryState title="Your library couldn't load."
+              description="Check your connection and try again. Your existing saves have not been deleted."
+              onRetry={() => void store.refresh().catch(() => undefined)}/>
           : topic
             ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
                 <Type variant="section">Nothing saved under {topic}.</Type>
