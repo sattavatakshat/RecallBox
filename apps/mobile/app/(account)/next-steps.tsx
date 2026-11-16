@@ -1,6 +1,6 @@
 import React, {useCallback, useRef, useState} from 'react';
 import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
-import {actionOptionsApi, ActionOption, shoppingApi, tripApi} from '../../src/api';
+import {actionOptionsApi, ActionOption, shoppingApi, tripApi, learningApi} from '../../src/api';
 import {useSession} from '../../src/session';
 import {Button, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 import {View} from 'react-native';
@@ -41,7 +41,7 @@ export default function NextSteps() {
 
   const shopping=options.find(option=>option.kind==='shopping');
   const travel=options.find(option=>option.kind==='trip');
-  const future=options.filter(option=>option.kind==='learning');
+  const learning=options.find(option=>option.kind==='learning');
   async function createTrip(){
     if(!memoryId||working)return;
     setWorking(true);setError('');
@@ -50,6 +50,15 @@ export default function NextSteps() {
       router.push({pathname:'/(account)/trip/[id]',params:{id:trip.id}});
     }catch{setError('Trip creation could not be confirmed. Your original source is still saved.');}
     finally{setWorking(false);}
+  }
+  async function addLearning() {
+    if (!memoryId || working) return;
+    setWorking(true);setError('');
+    try {
+      await auth.current(token=>learningApi.create(token,memoryId));
+      router.push('/(account)/learning');
+    } catch {setError('Learning queue addition was not confirmed. Your source remains saved.');}
+    finally {setWorking(false);}
   }
   return <Screen compact>
     <TextAction label="← Memory" onPress={()=>router.back()}/>
@@ -77,13 +86,14 @@ export default function NextSteps() {
       <Button label="Start a trip shortlist" disabled={working} busy={working}
         onPress={()=>void createTrip()}/>
     </View>}
-    {future.map(option=><View key={option.kind} style={{padding:14,borderRadius:14,
-      backgroundColor:p.surfaceMuted,gap:6}}>
-      <Type variant="label">{option.label}</Type>
-      <Type muted variant="caption">{option.reason}</Type>
-      <Type muted variant="caption">This workflow is not enabled yet. Your source stays available.</Type>
-    </View>)}
-    {loaded&&!shopping&&!travel&&!error&&<Notice>
+    {!!learning&&<View style={{padding:16,borderRadius:16,backgroundColor:p.surface,
+      borderWidth:1,borderColor:p.line,gap:10}}>
+      <Type variant="section">Learning queue</Type>
+      <Type muted>{learning.reason}</Type>
+      <Button label="Add to learning queue" disabled={working} busy={working}
+        onPress={()=>void addLearning()}/>
+    </View>}
+    {loaded&&!shopping&&!travel&&!learning&&!error&&<Notice>
       No specialized action can be verified for this source yet. You can still organize it in a collection.
     </Notice>}
     {!!memoryId&&<Button label="Add to a collection" variant="secondary"

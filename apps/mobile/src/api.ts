@@ -131,3 +131,23 @@ export const tripApi = {
     start_date?:string|null;end_date?:string|null;items?:TripItem[]})=>
     request<TripShortlist>(`/trip-shortlists/${encodeURIComponent(id)}`,'PATCH',body,access),
 };
+
+export type LearningStatus = 'not_started' | 'in_progress' | 'completed';
+export type LearningItem = {
+  id:string;source_memory_id:string;source_title:string;source_url:string|null;
+  status:LearningStatus;sort_order:number;version:number;created_at:string;updated_at:string;
+};
+export const learningApi = {
+  list:(access:string)=>request<{items:LearningItem[];has_more:boolean}>(
+    '/learning-items','GET',undefined,access),
+  get:(access:string,id:string)=>request<LearningItem>(
+    `/learning-items/${encodeURIComponent(id)}`,'GET',undefined,access),
+  create:(access:string,memoryId:string)=>request<LearningItem>(
+    `/memories/${encodeURIComponent(memoryId)}/learning-item`,'POST',undefined,access),
+  edit:(access:string,id:string,body:{expected_version:number;
+    status?:LearningStatus;move?:'up'|'down'})=>request<LearningItem>(
+    `/learning-items/${encodeURIComponent(id)}`,'PATCH',body,access),
+  remove:(access:string,id:string,version:number)=>request<void>(
+    `/learning-items/${encodeURIComponent(id)}?expected_version=${version}`,
+    'DELETE',undefined,access),
+};
