@@ -78,6 +78,8 @@ export type Collection = {
 export type CollectionsPage = {items: Collection[]; has_more: boolean};
 export type CollectionDetail = Collection & {items: MemorySummary[]; has_more: boolean};
 export const collectionsApi = {
+  forMemory: (access: string, id: string) => request<{items: Collection[]}>(
+    `/memories/${encodeURIComponent(id)}/collections`, 'GET', undefined, access),
   list: (access: string) => request<CollectionsPage>('/collections?limit=100', 'GET', undefined, access),
   get: (access: string, id: string) => request<CollectionDetail>(
     `/collections/${encodeURIComponent(id)}?limit=100`, 'GET', undefined, access),
