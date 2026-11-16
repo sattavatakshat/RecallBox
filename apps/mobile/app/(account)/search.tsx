@@ -1,56 +1,100 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
-import { memoriesApi, MemorySummary } from '../../src/api';
-import { useSession } from '../../src/session';
-import { Button, Input, Notice, Screen, TextAction, Type } from '../../src/ui';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Pressable, View} from 'react-native';
+import {router, useFocusEffect} from 'expo-router';
+import {memoriesApi, MemorySummary} from '../../src/api';
+import {useSession} from '../../src/session';
+import {Button, Input, Notice, Screen, TextAction, Type} from '../../src/ui';
 
 export default function Search() {
   const {authorized} = useSession();
   const auth = useRef(authorized); auth.current = authorized;
   const [q, setQ] = useState('');
   const [items, setItems] = useState<MemorySummary[]>([]);
-  const [status, setStatus] = useState('Search your saved titles and content.');
+  const [status, setStatus] = useState('Search everything you saved.');
   const [busy, setBusy] = useState(false);
-  const [mode,setMode] = useState<'keyword'|'semantic'>('keyword');
-  const [collection,setCollection] = useState('');
-  const [starred,setStarred] = useState(false);
-  const [collections,setCollections] = useState<{collection:string;count:number}[]>([]);
+  const [collection, setCollection] = useState('');
+  const [starred, setStarred] = useState(false);
+  const [collections, setCollections] = useState<{collection:string;count:number}[]>([]);
   const sequence = useRef(0);
-  useEffect(() => () => { sequence.current += 1; }, []);
+
   useFocusEffect(useCallback(() => {
     let active=true;
-    void auth.current(memoriesApi.collections).then(result => {if(active) setCollections(result.items);}).catch(() => undefined);
+    void auth.current(memoriesApi.collections).then(result => {
+      if(active) setCollections(result.items);
+    }).catch(() => undefined);
     return () => {active=false;};
   }, []));
-  async function search() {
-    const current = ++sequence.current;
-    setBusy(true); setItems([]); setStatus('Searching your library…');
+
+  async function search(requestId?: number) {
+    const current = requestId ?? ++sequence.current;
+    const query = q.trim();
+    if (!query && !collection && !starred) {
+      setItems([]); setStatus('Search everything you saved.'); setBusy(false);
+      return;
+    }
+    setBusy(true); setStatus('Looking through your library…');
     try {
-      const result = await authorized(token => memoriesApi.search(token, q.trim(),mode,collection || undefined,starred));
+      const result = await authorized(token =>
+        memoriesApi.search(token, query, 'keyword', collection || undefined, starred));
       if (current !== sequence.current) return;
       setItems(result.items);
-      setStatus((result.items.length ? `${result.items.length} results · includes archived memories` : 'No matches. Try a different word.') + (mode==='semantic' && result.pending_index ? ` · ${result.pending_index} memories awaiting indexing` : ''));
-    } catch { if (current === sequence.current) setStatus('Search could not load. Check your connection and try again.'); }
-    finally { if (current === sequence.current) setBusy(false); }
+      setStatus(result.items.length
+        ? `${result.items.length} saved ${result.items.length === 1 ? 'thing' : 'things'} found`
+        : 'Nothing matched. Try another word or remove a filter.');
+    } catch {
+      if (current === sequence.current)
+        setStatus('Search could not load. Check your connection and try again.');
+    } finally {
+      if (current === sequence.current) setBusy(false);
+    }
   }
-  return <Screen><TextAction label="Back to library" onPress={() => router.back()}/>
+
+  // Search as the user types, without showing implementation-specific modes.
+  // Sequence invalidates responses from obsolete queries or filter changes.
+  useEffect(() => {
+    const current = ++sequence.current;
+    if (!q.trim() && !collection && !starred) {
+      setItems([]); setBusy(false); setStatus('Search everything you saved.');
+      return;
+    }
+    const timer = setTimeout(() => void search(current), 350);
+    return () => {clearTimeout(timer); sequence.current += 1;};
+  }, [q, collection, starred]);
+
+  return <Screen compact>
+    <Type variant="eyebrow" muted>YOUR SAVED WORLD</Type>
     <Type title>Find it again.</Type>
-    <Input label="Search memories" value={q} onChangeText={setQ} maxLength={200} returnKeyType="search" onSubmitEditing={() => {if(q.trim()) void search();}}/>
+    <Type muted>Remember a place, idea or article? Search the things you've kept.</Type>
+    <Input label="Search your library" value={q} onChangeText={setQ}
+      maxLength={200} autoFocus autoCorrect={false} returnKeyType="search"
+      onSubmitEditing={() => void search()} placeholder="Try a name, place or keyword"/>
     <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>
-      <TextAction label={mode==='keyword'?'● Keywords':'Keywords'} disabled={busy} onPress={() => setMode('keyword')}/>
-      <TextAction label={mode==='semantic'?'● Meaning':'Meaning'} disabled={busy} onPress={() => setMode('semantic')}/>
-      <TextAction label={starred?'★ Starred only':'☆ All memories'} disabled={busy} onPress={() => setStarred(!starred)}/>
+      <TextAction label={starred ? '★ Starred only' : '☆ All memories'}
+        onPress={() => setStarred(current => !current)}/>
     </View>
-    <Type muted>{mode==='semantic'?'Local English sentence search · results ordered by similarity.':'Search titles, content, labels and collections.'}</Type>
-    {!!collections.length && <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-      <TextAction label={collection?'All collections':'● All collections'} onPress={() => setCollection('')}/>
-      {collections.map(item => <TextAction key={item.collection} label={`${collection===item.collection?'● ':''}${item.collection} (${item.count})`} onPress={() => setCollection(item.collection)}/>)}
+    {!!collections.length && <View style={{gap:6}}>
+      <Type variant="caption" muted>Collection</Type>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+        <TextAction label={collection ? 'All collections' : '● All collections'}
+          onPress={() => setCollection('')}/>
+        {collections.slice(0,7).map(item =>
+          <TextAction key={item.collection}
+            label={`${collection === item.collection ? '● ' : ''}${item.collection}`}
+            onPress={() => setCollection(item.collection)}/>)}
+      </View>
     </View>}
-    <Button label="Search your library" busy={busy} disabled={!q.trim() && !collection && !starred} onPress={() => void search()}/>
     <Notice>{status}</Notice>
-    {items.map(item => <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}>
-      <View style={{gap: 10, paddingVertical: 16}}><Type>{item.starred ? '★ ' : ''}{item.title || 'Untitled memory'}</Type><Type muted>{item.preview}</Type></View>
+    {items.map(item => <Pressable key={item.id} accessibilityRole="button"
+      accessibilityLabel={`Open ${item.title || 'saved memory'}`}
+      onPress={() => router.push({pathname:'/(account)/memory/[id]',params:{id:item.id}})}
+      style={({pressed}) => ({opacity:pressed ? 0.72 : 1})}>
+      <View style={{gap:6,paddingVertical:16}}>
+        <Type variant="label">{item.title || 'Untitled memory'}</Type>
+        {!!item.preview && <Type muted variant="caption" numberOfLines={2}>{item.preview}</Type>}
+        <Type muted variant="caption">{item.kind.toUpperCase()}</Type>
+      </View>
     </Pressable>)}
+    {!!q.trim() && <Button variant="secondary" label={busy ? 'Searching…' : 'Search again'}
+      busy={busy} onPress={() => void search()}/>}
   </Screen>;
 }
