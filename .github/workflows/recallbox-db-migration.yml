@@ -1,0 +1,101 @@
+name: RecallBox PostgreSQL migration smoke
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/**'
+      - 'src/recallbox/**'
+      - '.github/workflows/recallbox-db-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-and-check-rls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install product database tooling
+        run: python -m pip install -e '.[product]'
+      - name: Create isolated migration and runtime roles
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres <<'SQL'
+          CREATE ROLE recallbox_migrator LOGIN PASSWORD 'migration_pass';
+          CREATE ROLE recallbox_api LOGIN PASSWORD 'runtime_pass';
+          CREATE DATABASE recallbox OWNER recallbox_migrator;
+          SQL
+          psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d recallbox -c 'CREATE EXTENSION IF NOT EXISTS vector'
+      - name: Upgrade existing beta schema and preserve existing memories
+        env:
+          RECALLBOX_MIGRATION_URL: postgresql+psycopg://recallbox_migrator:migration_pass@127.0.0.1:5432/recallbox
+        run: |
+          alembic upgrade 0004_collections
+          python - <<'PY'
+          import psycopg
+          with psycopg.connect('postgresql://recallbox_migrator:migration_pass@127.0.0.1:5432/recallbox') as conn:
+              conn.execute("""
+                  INSERT INTO users(id) VALUES
+                    ('00000000-0000-0000-0000-000000000001'),
+                    ('00000000-0000-0000-0000-000000000002')
+              """)
+              conn.execute("""
+                  INSERT INTO memories (id,owner_id,kind,title,user_note,created_sequence)
+                  VALUES
+                    ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',
+                     'note','Travel notes','Plan a weekend',1),
+                    ('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000002',
+                     'note','Private note','Second account',1)
+              """)
+          PY
+          alembic upgrade head
+          alembic upgrade head
+      - name: Verify data, owner isolation and manual overrides
+        run: |
+          python - <<'PY'
+          import psycopg
+          root='postgresql://recallbox_migrator:migration_pass@127.0.0.1:5432/recallbox'
+          api='postgresql://recallbox_api:runtime_pass@127.0.0.1:5432/recallbox'
+          owner_a='00000000-0000-0000-0000-000000000001'
+          owner_b='00000000-0000-0000-0000-000000000002'
+          mem_a='10000000-0000-0000-0000-000000000001'
+          mem_b='10000000-0000-0000-0000-000000000002'
+          with psycopg.connect(root) as conn:
+              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0005_user_organization'
+              assert conn.execute('SELECT count(*) FROM memories').fetchone()[0] == 2
+          with psycopg.connect(api) as conn:
+              conn.execute('SELECT set_config(%s,%s,true)',('app.user_id',owner_a))
+              ids={str(r[0]) for r in conn.execute('SELECT id FROM memories')}
+              assert ids=={mem_a},ids
+              changed=conn.execute(
+                  'UPDATE memories SET topic_override=%s,tags_override=%s WHERE id=%s RETURNING id',
+                  ('Travel',['Road trip','Weekend'],mem_a)).fetchone()
+              assert changed and str(changed[0])==mem_a
+              # RLS must protect the second account even with a known UUID.
+              assert conn.execute(
+                  'UPDATE memories SET topic_override=%s WHERE id=%s RETURNING id',
+                  ('Ideas',mem_b)).fetchone() is None
+          with psycopg.connect(api) as conn:
+              conn.execute('SELECT set_config(%s,%s,true)',('app.user_id',owner_b))
+              ids={str(r[0]) for r in conn.execute('SELECT id FROM memories')}
+              assert ids=={mem_b},ids
+          with psycopg.connect(root) as conn:
+              saved=conn.execute('SELECT topic_override,tags_override,user_note FROM memories WHERE id=%s',(mem_a,)).fetchone()
+              assert saved==('Travel',['Road trip','Weekend'],'Plan a weekend'),saved
+              assert conn.execute('SELECT topic_override FROM memories WHERE id=%s',(mem_b,)).fetchone()[0] is None
+          PY
