@@ -110,30 +110,40 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     if (polling.current) return;
     polling.current = true;
     try {
-      await run(async () => {
-        if (!syncCursor.current) return;
-        try {
-          for (let pageNumber = 0; pageNumber < 10; pageNumber++) {
+      // One network page per queued operation. A foreground open/edit/save
+      // already waiting on the queue can run between sync pages instead of
+      // being blocked by up to ten serial network calls.
+      for (let pageNumber = 0; pageNumber < 10; pageNumber++) {
+        const hasMore = await run(async () => {
+          if (!syncCursor.current) return false;
+          try {
             const page = await auth.current(token => memoriesApi.sync(token, syncCursor.current!));
-            if (!alive.current) return;
+            if (!alive.current) return false;
             for (const change of page.changes) {
               if (change.operation === 'delete') records.current.delete(change.id);
               else merge(change.memory);
             }
             syncCursor.current = page.next_cursor;
-            publish(); setError('');
-            if (!page.has_more) return;
+            publish();
+            setError('');
+            return page.has_more;
+          } catch (cause) {
+            if (cause instanceof ApiError && cause.status === 410) {
+              setNotice('Your library was refreshed to bring back the latest saves. Open drafts are unchanged.');
+              await first(view.current, starredView.current);
+            } else if (alive.current) {
+              setError(errorMessage(cause));
+            }
+            return false;
           }
-        } catch (cause) {
-          if (cause instanceof ApiError && cause.status === 410) {
-            setNotice('Your library was refreshed to bring back the latest saves. Open drafts are unchanged.');
-            await first(view.current, starredView.current);
-          } else { if (alive.current) setError(errorMessage(cause)); }
-        }
-      });
+        });
+        if (!hasMore || !alive.current) return;
+      }
     } catch (cause) {
       if (alive.current) setError(errorMessage(cause));
-    } finally { polling.current = false; }
+    } finally {
+      polling.current = false;
+    }
   }, [run]);
   const get = useCallback((id: string) => run(() => auth.current(token => memoriesApi.get(token, id))), [run]);
   const create = useCallback((body: MemoryCreate, key: string) => run(async () => {
@@ -154,7 +164,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     alive.current = true;
     void refresh().catch(() => undefined);
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void sync(); });
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void sync(); }, 15000);
+    const timer = setInterval(() => { if (AppState.currentState === 'active') void sync(); }, 30000);
     return () => { alive.current = false; records.current.clear(); syncCursor.current = null; pageCursor.current = null; listener.remove(); clearInterval(timer); };
   }, [refresh, sync]);
   return <Context.Provider value={{items, archived, starredOnly, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove}}>{children}</Context.Provider>;
