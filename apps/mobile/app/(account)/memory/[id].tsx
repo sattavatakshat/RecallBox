@@ -138,9 +138,9 @@ export default function MemoryDetail() {
     }
   }
   const remote = store.items.find(note => note.id === id);
-  const hasSource = Boolean(base?.source_url || (base?.kind === 'link' || base?.kind === 'url') && base.content);
+  const hasSource = Boolean(base && (base.source_url || ((base.kind === 'link' || base.kind === 'url') && base.content)));
   const isPending = base?.processing_state === 'queued' || base?.processing_state === 'processing';
-  const hasReadableContent = Boolean(base?.extracted_text?.trim() || base?.kind === 'note' && base.content.trim());
+  const hasReadableContent = Boolean(base && (base.extracted_text.trim() || (base.kind === 'note' && base.content.trim())));
   return <Screen>
     <TextAction label="Back to Library" onPress={() => router.replace('/(account)')}/>
     <Type variant="eyebrow" muted>
