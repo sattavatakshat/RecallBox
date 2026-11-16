@@ -75,9 +75,12 @@ export default function ShoppingChecklist() {
     catch{setError('Could not open the original source.');}
   }
   return <Screen compact>
-    <TextAction label="← Memory" onPress={()=>router.push({
-      pathname:'/(account)/memory/[id]',params:{id:saved?.source_memory_id||''},
-    })}/>
+    <TextAction label="← Memory" onPress={()=> {
+      if(saved?.source_memory_id)router.replace({
+        pathname:'/(account)/memory/[id]',params:{id:saved.source_memory_id},
+      });
+      else router.back();
+    }}/>
     <Type variant="eyebrow" muted>FROM A VERIFIED RECIPE</Type>
     <Type title>Shopping list.</Type>
     <Type muted>Ingredients from {saved?.source_title||'the saved recipe'}. Edit every line before shopping.</Type>
