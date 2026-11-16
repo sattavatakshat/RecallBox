@@ -1,4 +1,7 @@
-import {Redirect, Stack, useSegments} from 'expo-router';
+import {Redirect, Stack, useSegments, usePathname, router} from 'expo-router';
+import {useEffect} from 'react';
+import {AppState} from 'react-native';
+import {requireOptionalNativeModule} from 'expo';
 import {View} from 'react-native';
 import {useSession} from '../../src/session';
 import {MemoryProvider} from '../../src/memories';
@@ -7,6 +10,27 @@ import {Notice, Screen, usePalette} from '../../src/ui';
 
 export default function Protected() {
   const {account, loading} = useSession();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!account || pathname.endsWith('/incoming-share')) return;
+    const native = requireOptionalNativeModule<{
+      activateShareAccount: (id: string) => Promise<boolean>;
+      peekShare: () => Promise<string | null>;
+    }>('RecallBoxCallback');
+    let active = true;
+    const check = async () => {
+      try {
+        if (!native || !(await native.activateShareAccount(account.id))) return;
+        const pending = await native.peekShare();
+        if (active && pending) router.push('/(account)/incoming-share');
+      } catch { /* Old builds do not have an inbound share module. */ }
+    };
+    void check();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void check();
+    });
+    return () => { active = false; subscription.remove(); };
+  }, [account?.id, pathname]);
   const p = usePalette();
   const segments = useSegments();
   const leaf = segments.length ? String(segments[segments.length - 1]) : '';

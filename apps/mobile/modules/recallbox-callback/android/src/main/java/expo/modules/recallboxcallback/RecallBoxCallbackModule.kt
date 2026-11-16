@@ -55,5 +55,15 @@ class RecallBoxCallbackModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("RecallBoxCallback")
     AsyncFunction("consumeCallback") { appContext.reactContext?.let { CallbackStore.consume(it) } }
+    AsyncFunction("activateShareAccount") { id: String -> appContext.reactContext?.let { ShareStore.activateAccount(it, id) } ?: false }
+    AsyncFunction("peekShare") { appContext.reactContext?.let { ShareStore.peek(it) } }
+    AsyncFunction("acknowledgeShare") { id: String -> appContext.reactContext?.let { ShareStore.acknowledge(it, id) } ?: false }
+    AsyncFunction("finishShare") {
+      val activity = appContext.currentActivity
+      if (activity?.intent?.action == android.content.Intent.ACTION_SEND) {
+        activity.runOnUiThread { activity.finish() }
+        true
+      } else false
+    }
   }
 }
