@@ -24,11 +24,11 @@ function summary(note: Memory): MemorySummary {
 export function errorMessage(error: unknown) {
   if (error instanceof ApiError) {
     if (error.status === 401) return 'Your session ended. Sign in again.';
-    if (error.code === 'version_conflict') return 'This note changed elsewhere. Your draft is still here.';
-    if (error.code === 'memory_not_found' || error.code === 'memory_deleted') return 'This note was deleted or is unavailable.';
-    if (error.code === 'idempotency_expired') return 'This save attempt expired. Check the inbox before starting a new note.';
+    if (error.code === 'version_conflict') return 'This memory changed elsewhere. Your draft is still here.';
+    if (error.code === 'memory_not_found' || error.code === 'memory_deleted') return 'This memory was deleted or is unavailable.';
+    if (error.code === 'idempotency_expired') return 'This save attempt expired. Check your library before saving again.';
     if (error.code === 'idempotency_mismatch') return 'This save key belongs to a different draft. Check the inbox before saving again.';
-    if (error.status === 413 || error.status === 422) return 'Check the note length and fields, then try again.';
+    if (error.status === 413 || error.status === 422) return 'Check the text and file size, then try again.';
   }
   return 'Could not reach your RecallBox. Check your connection and try again.';
 }
@@ -126,7 +126,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
           }
         } catch (cause) {
           if (cause instanceof ApiError && cause.status === 410) {
-            setNotice('Your sync position expired. The inbox was refreshed; open drafts are unchanged.');
+            setNotice('Your library was refreshed to bring back the latest saves. Open drafts are unchanged.');
             await first(view.current, starredView.current);
           } else { if (alive.current) setError(errorMessage(cause)); }
         }
