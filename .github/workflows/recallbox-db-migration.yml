@@ -76,7 +76,7 @@ jobs:
           mem_a='10000000-0000-0000-0000-000000000001'
           mem_b='10000000-0000-0000-0000-000000000002'
           with psycopg.connect(root) as conn:
-              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0006_shopping_lists'
+              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0007_trip_shortlists'
               assert conn.execute('SELECT count(*) FROM memories').fetchone()[0] == 2
           with psycopg.connect(api) as conn:
               conn.execute('SELECT set_config(%s,%s,true)',('app.user_id',owner_a))
@@ -89,6 +89,9 @@ jobs:
               conn.execute("""INSERT INTO shopping_lists(id,owner_id,source_memory_id,title,items)
                 VALUES(%s,%s,%s,'Shopping list','[]'::jsonb)""",
                 ('20000000-0000-0000-0000-000000000001',owner_a,mem_a))
+              conn.execute("""INSERT INTO trip_shortlists(id,owner_id,source_memory_id,name)
+                VALUES(%s,%s,%s,'My trip')""",
+                ('30000000-0000-0000-0000-000000000001',owner_a,mem_a))
               # RLS must protect the second account even with a known UUID.
               assert conn.execute(
                   'UPDATE memories SET topic_override=%s WHERE id=%s RETURNING id',
@@ -98,6 +101,7 @@ jobs:
               ids={str(r[0]) for r in conn.execute('SELECT id FROM memories')}
               assert ids=={mem_b},ids
               assert conn.execute('SELECT count(*) FROM shopping_lists').fetchone()[0] == 0
+              assert conn.execute('SELECT count(*) FROM trip_shortlists').fetchone()[0] == 0
               assert conn.execute("""UPDATE shopping_lists SET title='Tampered'
                 WHERE id=%s RETURNING id""",
                 ('20000000-0000-0000-0000-000000000001',)).fetchone() is None
