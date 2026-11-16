@@ -96,3 +96,23 @@ export const collectionsApi = {
     `/collections/${encodeURIComponent(collectionId)}/memories/${encodeURIComponent(memoryId)}`,
     'DELETE', undefined, access),
 };
+
+export type ActionOption = {kind:'shopping'|'trip'|'learning';label:string;reason:string;evidence_lines:string[]};
+export const actionOptionsApi = {
+  forMemory: (access:string,id:string) => request<{items:ActionOption[]}>(
+    `/memories/${encodeURIComponent(id)}/action-options`,'GET',undefined,access),
+};
+export type ShoppingItem = {id:string;text:string;checked:boolean;
+  origin:'source'|'user';source_quote:string|null};
+export type ShoppingList = {id:string;source_memory_id:string;title:string;
+  source_title:string;source_url:string|null;items:ShoppingItem[];version:number;
+  created_at:string;updated_at:string};
+export const shoppingApi = {
+  create:(access:string,memoryId:string)=>request<ShoppingList>(
+    `/memories/${encodeURIComponent(memoryId)}/shopping-list`,'POST',undefined,access),
+  get:(access:string,id:string)=>request<ShoppingList>(
+    `/shopping-lists/${encodeURIComponent(id)}`,'GET',undefined,access),
+  edit:(access:string,id:string,body:{expected_version:number;
+    title?:string;items?:ShoppingItem[]})=>request<ShoppingList>(
+    `/shopping-lists/${encodeURIComponent(id)}`,'PATCH',body,access),
+};

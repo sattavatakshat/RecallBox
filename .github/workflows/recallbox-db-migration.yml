@@ -76,7 +76,7 @@ jobs:
           mem_a='10000000-0000-0000-0000-000000000001'
           mem_b='10000000-0000-0000-0000-000000000002'
           with psycopg.connect(root) as conn:
-              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0005_user_organization'
+              assert conn.execute('SELECT version_num FROM alembic_version').fetchone()[0]=='0006_shopping_lists'
               assert conn.execute('SELECT count(*) FROM memories').fetchone()[0] == 2
           with psycopg.connect(api) as conn:
               conn.execute('SELECT set_config(%s,%s,true)',('app.user_id',owner_a))
@@ -86,6 +86,9 @@ jobs:
                   'UPDATE memories SET topic_override=%s,tags_override=%s WHERE id=%s RETURNING id',
                   ('Travel',['Road trip','Weekend'],mem_a)).fetchone()
               assert changed and str(changed[0])==mem_a
+              conn.execute("""INSERT INTO shopping_lists(id,owner_id,source_memory_id,title,items)
+                VALUES(%s,%s,%s,'Shopping list','[]'::jsonb)""",
+                ('20000000-0000-0000-0000-000000000001',owner_a,mem_a))
               # RLS must protect the second account even with a known UUID.
               assert conn.execute(
                   'UPDATE memories SET topic_override=%s WHERE id=%s RETURNING id',
@@ -94,8 +97,13 @@ jobs:
               conn.execute('SELECT set_config(%s,%s,true)',('app.user_id',owner_b))
               ids={str(r[0]) for r in conn.execute('SELECT id FROM memories')}
               assert ids=={mem_b},ids
+              assert conn.execute('SELECT count(*) FROM shopping_lists').fetchone()[0] == 0
+              assert conn.execute("""UPDATE shopping_lists SET title='Tampered'
+                WHERE id=%s RETURNING id""",
+                ('20000000-0000-0000-0000-000000000001',)).fetchone() is None
           with psycopg.connect(root) as conn:
               saved=conn.execute('SELECT topic_override,tags_override,user_note FROM memories WHERE id=%s',(mem_a,)).fetchone()
               assert saved==('Travel',['Road trip','Weekend'],'Plan a weekend'),saved
               assert conn.execute('SELECT topic_override FROM memories WHERE id=%s',(mem_b,)).fetchone()[0] is None
+              assert conn.execute('SELECT title FROM shopping_lists WHERE owner_id=%s',(owner_a,)).fetchone()[0] == 'Shopping list'
           PY
