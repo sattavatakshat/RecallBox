@@ -314,6 +314,8 @@ export default function MemoryDetail() {
         }}/>
       </View>}
       {unavailable && <Notice>This memory is unavailable. Your draft has not been discarded.</Notice>}
+      <Button variant="secondary" label="View source coverage" disabled={busy}
+        onPress={() => router.push({pathname:'/(account)/source/[id]',params:{id}})}/>
       <TextAction label={showSourceDetails ? 'Hide source details' : 'Source details'}
         onPress={() => setShowSourceDetails(current => !current)}/>
       {showSourceDetails && <View style={{gap:8}}>

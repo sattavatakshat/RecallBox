@@ -1,0 +1,105 @@
+import React, {useCallback, useEffect, useState} from 'react';
+import {Image, Linking, View} from 'react-native';
+import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
+import {Memory} from '../../../src/api';
+import {apiURL} from '../../../src/config';
+import {useMemories} from '../../../src/memories';
+import {useSession} from '../../../src/session';
+import {Button, Notice, Screen, TextAction, Type, usePalette} from '../../../src/ui';
+
+export default function SourceCoverage() {
+  const {id}=useLocalSearchParams<{id:string}>();
+  const store=useMemories();
+  const {authorized}=useSession();
+  const p=usePalette();
+  const [record,setRecord]=useState<Memory|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+  const [imageSource,setImageSource]=useState<{uri:string;headers:{Authorization:string}}|null>(null);
+  const [imageError,setImageError]=useState(false);
+
+  const load=useCallback(async()=>{
+    if(!id)return;
+    setLoading(true);setError('');
+    try{setRecord(await store.get(id));}
+    catch{setError('This source could not be loaded. Check your connection and try again.');}
+    finally{setLoading(false);}
+  },[id,store.get]);
+  useFocusEffect(useCallback(()=>{if(!record)void load();},[record,load]));
+  useEffect(()=>{
+    let active=true;
+    if(record?.kind==='image'){
+      void authorized(async token=>({
+        uri:`${apiURL()}/v1/memories/${record.id}/asset`,
+        headers:{Authorization:`Bearer ${token}`},
+      })).then(source=>{if(active)setImageSource(source);})
+        .catch(()=>{if(active)setImageError(true);});
+    }
+    return ()=>{active=false;};
+  },[record?.id,record?.kind]);
+
+  const coverage=record?.kind==='note'?'Your own note is preserved as written.'
+    :record?.processing_state==='ready'?'Available source text was extracted.'
+    :record?.processing_state==='metadata_only'
+      ?'Only the original file/link and available metadata were saved. The full contents were not extracted.'
+    :record?.processing_state==='failed'?'Source details could not be extracted.'
+    :'This source has not completed processing.';
+  const glyph=record?.kind==='image'?'▧':record?.kind==='pdf'?'▤':
+    record?.kind==='note'?'≡':'↗';
+  const text=record?.kind==='note'?record.content:record?.extracted_text??'';
+
+  async function openLink(){
+    if(!record?.source_url)return;
+    try{await Linking.openURL(record.source_url);}
+    catch{setError('Unable to open the original on this device.');}
+  }
+  return <Screen compact>
+    <TextAction label="← Memory" onPress={()=>router.back()}/>
+    <Type title>Real content, not guesses.</Type>
+    <Type muted>Different sources provide different levels of evidence. RecallBox never fills gaps with invented details.</Type>
+    {!!error&&<Notice kind="error">{error}</Notice>}
+    {loading&&<Notice>Loading saved source details…</Notice>}
+    {!record&&!loading&&<Button label="Try again" onPress={()=>void load()}/>}
+    {record&&<>
+      <View style={{height:148,borderRadius:22,backgroundColor:p.surfaceMuted,
+        justifyContent:'center',alignItems:'center'}}>
+        <Type style={{fontSize:55,color:p.accent}}>{glyph}</Type>
+      </View>
+      <Type variant="section" numberOfLines={3}>{record.title||'Saved source'}</Type>
+      {record.kind==='image'&&imageSource&&!imageError&&
+        <Image source={imageSource} resizeMode="contain"
+          style={{width:'100%',height:280,borderRadius:16}}
+          onError={()=>setImageError(true)}/>}
+      {imageError&&<Notice kind="error">The private image preview is unavailable. The saved file may still be accessible from Memory Detail.</Notice>}
+      <Type variant="eyebrow" muted>COVERAGE</Type>
+      <View style={{backgroundColor:p.surfaceMuted,padding:17,borderRadius:16,gap:8}}>
+        <Type variant="label">{record.processing_state==='ready'?'Available text':
+          record.processing_state==='metadata_only'?'Link or preview only':
+          record.processing_state==='failed'?'Processing failed':'Source saved'}</Type>
+        <Type muted>{coverage}</Type>
+        {!!record.processing_error&&<Type muted variant="caption">{record.processing_error}</Type>}
+      </View>
+      {!!text.trim()&&<View style={{gap:10}}>
+        <Type variant="section">Text we actually have</Type>
+        <Type style={{lineHeight:26}}>{text.slice(0,6000)}</Type>
+        {text.length>6000&&<Notice>This view shows an excerpt of available source text.</Notice>}
+      </View>}
+      <Type variant="eyebrow" muted>SOURCE DETAILS</Type>
+      <View style={{backgroundColor:p.surface,padding:17,borderRadius:16,borderWidth:1,
+        borderColor:p.line,gap:8}}>
+        <Type muted variant="caption">Type: {record.kind.toUpperCase()}</Type>
+        <Type muted variant="caption">Saved: {new Date(record.created_at).toLocaleDateString()}</Type>
+        {!!record.source_url&&<Type muted variant="caption" numberOfLines={3}>{record.source_url}</Type>}
+        <Type muted variant="caption">Processing: {record.processing_state.replace('_',' ')}</Type>
+      </View>
+      {!!record.source_url&&<Button label="Open original source" onPress={()=>void openLink()}/>}
+      {['pdf','image'].includes(record.kind)&&<Button label="Open or share the saved file"
+        variant="secondary" onPress={()=>router.replace({
+          pathname:'/(account)/memory/[id]',params:{id:record.id},
+        })}/>}
+      {record.processing_state==='metadata_only'&&<Notice>
+        A restricted reel or social page may be a finished link-only save. That does not mean its video was analyzed.
+      </Notice>}
+    </>}
+  </Screen>;
+}
