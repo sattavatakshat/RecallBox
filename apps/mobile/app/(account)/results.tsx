@@ -20,6 +20,7 @@ export default function Results() {
   const params = useLocalSearchParams<{q?: string}>();
   const q = typeof params.q === 'string' ? params.q.trim().slice(0,200) : '';
   const {authorized} = useSession();
+  const auth = useRef(authorized);auth.current = authorized;
   const store = useMemories();
   const p = usePalette();
   const [items, setItems] = useState<MemorySummary[]>([]);
@@ -41,7 +42,7 @@ export default function Results() {
     setBusy(true);setError('');setSearched(false);setItems([]);
     void (async () => {
       try {
-        const result = await authorized(token => memoriesApi.search(token,q,'keyword',undefined,starred));
+        const result = await auth.current(token => memoriesApi.search(token,q,'keyword',undefined,starred));
         if (generation.current !== current) return;
         const keyword = result.items.filter(usable);
         setItems(keyword);
@@ -49,7 +50,7 @@ export default function Results() {
         // Missing index never removes authentic keyword matches.
         if (keyword.length < 6 && q.length >= 4) {
           try {
-            const related = await authorized(token => memoriesApi.search(token,q,'semantic',undefined,starred));
+            const related = await auth.current(token => memoriesApi.search(token,q,'semantic',undefined,starred));
             if (generation.current !== current) return;
             const ids = new Set(keyword.map(item => item.id));
             setItems([...keyword,...related.items.filter(item => usable(item) && !ids.has(item.id))]);
@@ -64,7 +65,7 @@ export default function Results() {
       }
     })();
     return () => {generation.current += 1;};
-  },[q,starred,authorized]);
+  },[q,starred]);
 
   async function toggleStar(item: MemorySummary) {
     if (working) return;
