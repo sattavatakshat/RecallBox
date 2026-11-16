@@ -68,7 +68,7 @@ async def create_item(memory_id: UUID, request: Request, who=Depends(principal))
     owner = who[0]
     async with writing(request, who) as conn:
         # Serializes per-account insert/reorder and keeps ordering deterministic.
-        await conn.fetchrow('SELECT id FROM users WHERE id=$1 FOR UPDATE', owner)
+        await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', str(owner))
         existing = await conn.fetchval("""SELECT id FROM learning_items
             WHERE owner_id=$1 AND source_memory_id=$2 AND deleted_at IS NULL""",
             owner, memory_id)
@@ -94,7 +94,7 @@ async def edit_item(item_id: UUID, body: LearningEdit, request: Request,
                     who=Depends(principal)):
     owner = who[0]
     async with writing(request, who) as conn:
-        await conn.fetchrow('SELECT id FROM users WHERE id=$1 FOR UPDATE', owner)
+        await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', str(owner))
         current = await find(conn, owner, item_id, locked=True)
         if current['version'] != body.expected_version:
             raise Problem(409, 'learning_version_conflict', current=output(current))
