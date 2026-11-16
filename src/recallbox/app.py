@@ -19,6 +19,7 @@ from .collections import router as collection_router
 from .problems import Problem
 from .sync import router as sync_router
 from .capture import router as capture_router
+from .action_options import router as action_options_router
 
 logger = logging.getLogger('recallbox')
 
@@ -184,4 +185,5 @@ def create_app():
     app.include_router(collection_router)
     app.include_router(sync_router)
     app.include_router(capture_router)
+    app.include_router(action_options_router)
     return app
