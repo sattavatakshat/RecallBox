@@ -110,7 +110,7 @@ def memory(row, *, detail=True):
     result = {k: row[k] for k in ('id', 'kind', 'title', 'version', 'starred', 'archived', 'created_at', 'updated_at')}
     result['content' if detail else 'preview'] = row['user_note'] if detail else row['user_note'][:200]
     for key in ('source_url', 'processing_state', 'processing_error', 'labels', 'collection',
-                'topic_override', 'tags_override'):
+                'topic_override', 'tags_override', 'suggested_topic', 'suggested_topic_reason'):
         result[key] = row[key]
     if detail:
         result['extracted_text'] = row['extracted_text']
@@ -120,7 +120,8 @@ def memory(row, *, detail=True):
 def summary_columns(*, prefix=''):
     columns = ('id', 'kind', 'title', 'version', 'starred', 'archived', 'created_at',
                'updated_at', 'source_url', 'processing_state', 'processing_error', 'labels',
-               'collection', 'topic_override', 'tags_override')
+               'collection', 'topic_override', 'tags_override',
+               'suggested_topic', 'suggested_topic_reason')
     return ','.join(prefix + column for column in columns) + f',left({prefix}user_note,200) AS user_note'
 
 
