@@ -16,7 +16,7 @@ router = APIRouter(prefix='/v1')
 
 class ShoppingItem(BaseModel):
     model_config = ConfigDict(extra='forbid',strict=True)
-    id: UUID
+    id: UUID = Field(strict=False)
     text: str = Field(min_length=1,max_length=200)
     checked: bool = False
     origin: Literal['source','user']
