@@ -27,6 +27,7 @@ export default function MemoryDetail() {
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showSourceDetails, setShowSourceDetails] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
   const opening = useRef(false);
   const dirty = Boolean(base && (title !== base.title || content !== base.content || collection !== base.collection));
   const release = usePreventRemove(dirty && !leaving, ({repeat}) => {
@@ -116,9 +117,9 @@ export default function MemoryDetail() {
   }
   function confirmDelete() {
     if (!base || busy) return;
-    Alert.alert(base.kind === 'link' ? 'Delete this link?' : 'Delete this note?', 'It will leave your library and disappear from your other devices after sync.', [
-      {text: 'Keep note', style: 'cancel'},
-      {text: 'Delete note', style: 'destructive', onPress: () => void (async () => {
+    Alert.alert('Delete this memory?', 'It will leave your library and disappear from your other devices after sync.', [
+      {text: 'Keep memory', style: 'cancel'},
+      {text: 'Delete memory', style: 'destructive', onPress: () => void (async () => {
         setBusy(true); setError('');
         try { await store.remove(id, base.version); setLeaving(true); release(); router.replace('/(account)'); }
         catch (cause) { failed(cause); }
@@ -207,8 +208,10 @@ export default function MemoryDetail() {
           onPress={() => void update({starred: !base.starred})}/>
         <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
           onPress={() => router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}})}/>
-        <TextAction label={editing ? 'Editing' : 'Edit'} disabled={busy || unavailable}
+        <TextAction label={editing ? 'Editing' : 'Edit'} disabled={busy || unavailable || editing}
           onPress={() => setEditing(true)}/>
+        <TextAction label={showMoreActions ? 'Fewer options' : 'More options'}
+          onPress={() => setShowMoreActions(value => !value)}/>
       </View>
       {editing && <View style={{gap:16}}>
         <Type variant="section">Edit memory</Type>
@@ -235,8 +238,10 @@ export default function MemoryDetail() {
             ])}/>
         </View>}
         <Button label="Save changes" busy={busy}
-          disabled={!dirty || unavailable || Boolean(conflict)}
-          onPress={() => void update({title, content, collection})}/>
+          disabled={!dirty || unavailable || Boolean(conflict) ||
+            ((base.kind === 'note' || base.kind === 'link' || base.kind === 'url') && !content.trim())}
+          onPress={() => void update(base.kind === 'note' || base.kind === 'link' || base.kind === 'url'
+            ? {title, content, collection} : {title, collection})}/>
         <TextAction label="Cancel editing" disabled={busy} onPress={() => {
           if (dirty) {
             Alert.alert('Discard changes?', 'Your unsaved edits will be lost.',[
@@ -256,10 +261,14 @@ export default function MemoryDetail() {
         <Type muted variant="caption">Version: {base.version}</Type>
         {!!base.processing_error && <Notice kind="error">{base.processing_error}</Notice>}
       </View>}
-      <TextAction label={base.archived ? 'Restore from archive' : 'Archive memory'}
-        disabled={busy || unavailable || Boolean(conflict)}
-        onPress={() => void update({archived: !base.archived})}/>
-      <TextAction label="Delete memory" disabled={busy || unavailable} onPress={confirmDelete}/>
+      {showMoreActions && <View style={{gap:8,paddingTop:8}}>
+        <Type variant="section">More options</Type>
+        <TextAction label={base.archived ? 'Restore from archive' : 'Archive memory'}
+          disabled={busy || unavailable || Boolean(conflict) || dirty}
+          onPress={() => void update({archived: !base.archived})}/>
+        <TextAction label="Delete memory" disabled={busy || unavailable || dirty}
+          onPress={confirmDelete}/>
+      </View>}
     </>}
   </Screen>;
 }
