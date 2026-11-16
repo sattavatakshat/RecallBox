@@ -96,6 +96,13 @@ export default function NextSteps() {
     {loaded&&!shopping&&!travel&&!learning&&!error&&<Notice>
       No specialized action can be verified for this source yet. You can still organize it in a collection.
     </Notice>}
+    {!!memoryId&&<View style={{padding:16,borderRadius:16,backgroundColor:p.surface,
+      borderWidth:1,borderColor:p.line,gap:10}}>
+      <Type variant="section">Reminder</Type>
+      <Type muted>Pick a time to revisit your saved memory. Reminders stay inside RecallBox.</Type>
+      <Button label="Set a reminder" variant="secondary"
+        onPress={()=>router.push({pathname:'/(account)/reminder',params:{memoryId}})}/>
+    </View>}
     {!!memoryId&&<Button label="Add to a collection" variant="secondary"
       onPress={()=>router.push({pathname:'/(account)/add-to-collection',params:{memoryId}})}/>}
     {error&&<Button label="Check again" variant="secondary" onPress={()=>void load()}/>}
