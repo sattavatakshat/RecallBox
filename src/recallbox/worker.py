@@ -13,6 +13,7 @@ from .config import Settings
 from .db import connect, owned
 from .memories import publish
 from .embeddings import embed
+from .topics import suggest_topic
 
 
 async def process(row, asset):
@@ -100,14 +101,30 @@ async def tick(pool, owner):
         await conn.execute('''UPDATE ingestion_jobs SET state=$2,error=$3,lease_until=NULL,available_at=now()+interval '15 seconds',updated_at=now()
           WHERE memory_id=$1''',row['id'],'queued' if again else ('failed' if state=='failed' else 'done'),result.get('error'))
         if index_only:
-            await conn.execute('UPDATE memories SET embedding=$2::vector,embedding_version=$3 WHERE id=$1',row['id'],vector,1 if vector else None)
+            # Notes are source text supplied by the user. Retrying indexing must
+            # never replace their manual topic/tags or create speculative labels.
+            if current['kind']=='note' or current['processing_state']=='ready':
+                suggested, reason = suggest_topic(current['title'],current['user_note']+'\\n'+current['extracted_text'])
+            else:
+                suggested, reason = None, None
+            if (current['suggested_topic'],current['suggested_topic_reason']) != (suggested,reason):
+                updated = await conn.fetchrow('''UPDATE memories SET suggested_topic=$2,
+                  suggested_topic_reason=$3,version=version+1,updated_at=clock_timestamp()
+                  WHERE id=$1 RETURNING *''', row['id'],suggested,reason)
+                await publish(conn,owner,updated,'upsert')
+            await conn.execute('UPDATE memories SET embedding=$2::vector,embedding_version=$3 WHERE id=$1',
+                               row['id'],vector,1 if vector else None)
             print(json.dumps({'event':'memory_indexed','state':state}),flush=True)
             return True
         title = result.get('title') if current['title']==row['title'] and row['kind']=='url' and row['title']==urlsplit(row['source_url']).hostname else None
+        suggested, reason = suggest_topic(title or current['title'], result.get('text','')) if state=='ready' else (None,None)
         updated = await conn.fetchrow('''UPDATE memories SET processing_state=$2,processing_error=$3,extracted_text=$4,
-          title=$5,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *''',row['id'],state,result.get('error'),result.get('text','')[:100000],title or current['title'])
+          title=$5,suggested_topic=$6,suggested_topic_reason=$7,version=version+1,
+          updated_at=clock_timestamp() WHERE id=$1 RETURNING *''',
+          row['id'],state,result.get('error'),result.get('text','')[:100000],title or current['title'],suggested,reason)
         await publish(conn,owner,updated,'upsert')
-        await conn.execute('UPDATE memories SET embedding=$2::vector,embedding_version=$3 WHERE id=$1',row['id'],vector,1 if vector else None)
+        await conn.execute('UPDATE memories SET embedding=$2::vector,embedding_version=$3 WHERE id=$1',
+                           row['id'],vector,1 if vector else None)
     print(json.dumps({'event':'capture_processed','state':state,'attempt':attempt}),flush=True)
     return True
 

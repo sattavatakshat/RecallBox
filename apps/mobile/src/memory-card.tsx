@@ -46,7 +46,10 @@ export function MemoryCard({memory, onOpen, onStar, busy = false}: {
 }) {
   const p = usePalette();
   const meta = [kindLabel(memory), sourceName(memory)].filter(Boolean).join(' · ');
-  const detail = [shortDate(memory.created_at), memory.collection].filter(Boolean).join(' · ');
+  const effectiveTopic = memory.topic_override === 'Uncategorized'
+    ? null : (memory.topic_override ?? memory.suggested_topic ?? null);
+  const detail = [effectiveTopic, shortDate(memory.created_at), memory.collection]
+    .filter(Boolean).join(' · ');
   return <View style={{flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: p.line, minHeight: 82}}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Open ${humanTitle(memory)}`}

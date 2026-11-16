@@ -21,9 +21,12 @@ export default function Inbox() {
     item.kind === 'note' || item.processing_state === 'ready' || item.processing_state === 'metadata_only');
   const unfinishedCount = store.items.filter(item =>
     item.processing_state === 'queued' || item.processing_state === 'processing' || item.processing_state === 'failed').length;
-  const topics = Array.from(new Set(usable.flatMap(item => item.labels || [])))
-    .filter(label => label.length > 0).slice(0, 5);
-  const visible = topic ? usable.filter(item => item.labels?.includes(topic)) : usable;
+  const topicOf = (item: MemorySummary) =>
+    item.topic_override === 'Uncategorized' ? null :
+      (item.topic_override ?? item.suggested_topic ?? null);
+  const topics = Array.from(new Set(usable.map(topicOf).filter((value): value is string => Boolean(value))))
+    .slice(0, 5);
+  const visible = topic ? usable.filter(item => topicOf(item) === topic) : usable;
   useFocusEffect(useCallback(() => { void store.sync(); }, [store.sync]));
   async function toggle(note: MemorySummary, field: 'starred' | 'archived') {
     if (working) return;

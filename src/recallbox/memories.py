@@ -63,11 +63,43 @@ class EditNote(BaseModel):
     starred: bool | None = None
     archived: bool | None = None
     collection: str | None = Field(default=None, max_length=80)
+    # Nullable only for these two fields: None means revert to automatic,
+    # while [] on tags means the user intentionally selected no custom tags.
+    topic_override: str | None = Field(default=None, max_length=48)
+    tags_override: list[str] | None = Field(default=None, max_length=12)
+
+    @field_validator('topic_override')
+    @classmethod
+    def valid_topic(cls, value):
+        if value is None:
+            return None
+        clean = value.strip()
+        if not clean or any(ord(char) < 32 or ord(char) == 127 for char in clean):
+            raise ValueError('Invalid topic')
+        return clean
+
+    @field_validator('tags_override')
+    @classmethod
+    def valid_tags(cls, value):
+        if value is None:
+            return None
+        tags = []
+        seen = set()
+        for tag in value:
+            clean = tag.strip()
+            if (not clean or len(clean) > 40
+                    or any(ord(char) < 32 or ord(char) == 127 for char in clean)
+                    or clean.casefold() in seen):
+                raise ValueError('Invalid or duplicate tag')
+            tags.append(clean)
+            seen.add(clean.casefold())
+        return tags
 
     @model_validator(mode='after')
     def fields_valid(self):
         fields = self.model_fields_set - {'expected_version'}
-        if not fields or any(getattr(self, field) is None for field in fields):
+        nullable_resets = {'topic_override', 'tags_override'}
+        if not fields or any(getattr(self, field) is None for field in fields - nullable_resets):
             raise ValueError('Specify non-null editable fields')
         if self.content is not None and not self.content.strip():
             raise ValueError('Empty note')
@@ -77,7 +109,8 @@ class EditNote(BaseModel):
 def memory(row, *, detail=True):
     result = {k: row[k] for k in ('id', 'kind', 'title', 'version', 'starred', 'archived', 'created_at', 'updated_at')}
     result['content' if detail else 'preview'] = row['user_note'] if detail else row['user_note'][:200]
-    for key in ('source_url', 'processing_state', 'processing_error', 'labels', 'collection'):
+    for key in ('source_url', 'processing_state', 'processing_error', 'labels', 'collection',
+                'topic_override', 'tags_override', 'suggested_topic', 'suggested_topic_reason'):
         result[key] = row[key]
     if detail:
         result['extracted_text'] = row['extracted_text']
@@ -86,7 +119,9 @@ def memory(row, *, detail=True):
 
 def summary_columns(*, prefix=''):
     columns = ('id', 'kind', 'title', 'version', 'starred', 'archived', 'created_at',
-               'updated_at', 'source_url', 'processing_state', 'processing_error', 'labels', 'collection')
+               'updated_at', 'source_url', 'processing_state', 'processing_error', 'labels',
+               'collection', 'topic_override', 'tags_override',
+               'suggested_topic', 'suggested_topic_reason')
     return ','.join(prefix + column for column in columns) + f',left({prefix}user_note,200) AS user_note'
 
 
@@ -204,7 +239,8 @@ async def search_memories(request: Request, q: str = Query(default='', max_lengt
             to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text), plainto_tsquery('english',$1)) AS rank
             FROM memories WHERE deleted_at IS NULL AND ($1='' OR
               to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text) @@ plainto_tsquery('english',$1)
-              OR strpos(lower(title || ' ' || user_note || ' ' || extracted_text || ' ' || collection || ' ' || array_to_string(labels,' ')),lower($1))>0)
+              OR strpos(lower(title || ' ' || user_note || ' ' || extracted_text || ' ' || collection || ' ' || array_to_string(labels,' ') || ' ' || coalesce(topic_override,'') || ' ' ||
+              coalesce(array_to_string(tags_override,' '),'')),lower($1))>0)
             AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
             ORDER BY rank DESC,updated_at DESC,id DESC LIMIT 50''', q.strip(),collection,starred)
         pending = await conn.fetchval('SELECT count(*) FROM memories WHERE deleted_at IS NULL AND embedding IS NULL')
@@ -243,11 +279,14 @@ async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depen
                 require_http_bookmark(values['user_note'])
             except ValueError:
                 raise Problem(422, 'invalid_request') from None
-        if all(values[k] == row[k] for k in ('title', 'user_note', 'starred', 'archived', 'collection')):
+        if all(values[k] == row[k] for k in ('title', 'user_note', 'starred', 'archived',
+                                            'collection', 'topic_override', 'tags_override')):
             return memory(row)
         updated = await conn.fetchrow('''UPDATE memories SET title=$1,user_note=$2,starred=$3,archived=$4,
-            collection=$5,version=version+1,updated_at=clock_timestamp() WHERE id=$6 RETURNING *''',
-            values['title'], values['user_note'], values['starred'], values['archived'], values['collection'], memory_id)
+            collection=$5,topic_override=$6,tags_override=$7,version=version+1,
+            updated_at=clock_timestamp() WHERE id=$8 RETURNING *''',
+            values['title'], values['user_note'], values['starred'], values['archived'],
+            values['collection'], values['topic_override'], values['tags_override'], memory_id)
         await publish(conn, who[0], updated, 'upsert')
         if values['title']!=row['title'] or values['user_note']!=row['user_note']:
             await conn.execute('UPDATE memories SET embedding=NULL,embedding_version=NULL WHERE id=$1',memory_id)
