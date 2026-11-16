@@ -273,7 +273,10 @@ export default function MemoryDetail() {
         <TextAction label="Compare with latest" disabled={busy} onPress={() => void compare()}/>
       </>}
       <Type variant="section">Useful next steps</Type>
-      <Notice>Actions that require a recipe, place or tutorial will only appear when RecallBox can verify that information. Star or organize this memory anytime.</Notice>
+      <Type muted>Only actions backed by this saved source are available.</Type>
+      <Button variant="secondary" label="See useful next steps" disabled={busy || unavailable || dirty}
+        onPress={() => router.push({pathname:'/(account)/next-steps',
+          params:{memoryId:id}})}/>
       {editing && <View style={{gap:16}}>
         <Type variant="section">Edit memory</Type>
         <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
