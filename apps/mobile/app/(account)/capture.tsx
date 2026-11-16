@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { router } from 'expo-router';
+import {Alert} from 'react-native';
+import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,12 +12,31 @@ import { Button, Input, Notice, Screen, TextAction, Type } from '../../src/ui';
 type Intent = {key: string; url?: string; uri?: string; mime?: string; name?: string};
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 export default function Capture() {
+  const {method} = useLocalSearchParams<{method?: string}>();
+  const imageOnly = method === 'image';
+  const pdfOnly = method === 'pdf';
   const {authorized} = useSession();
   const [url,setUrl] = useState('');
   const [busy,setBusy] = useState(false);
   const [message,setMessage] = useState('Articles, screenshots, photos and PDFs. Originals are saved privately. Files up to 8 MiB.');
   const [pending,setPending] = useState<Intent | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const lock = useRef(false);
+  const release = usePreventRemove((Boolean(pending || url.trim()) || busy) && !leaving, ({repeat}) => {
+    if (lock.current) {Alert.alert('Save in progress', 'Wait for the save request to finish.');return;}
+    Alert.alert('Leave this capture?', pending
+      ? 'The save is not confirmed. Retry safely here, or check Recently captured before saving again. This draft is only on this screen.'
+      : 'This link has not been saved. Leaving discards your entry.', [
+      {text: 'Keep editing', style: 'cancel'},
+      {text: 'Leave', style: 'destructive', onPress: () => {setLeaving(true);release();repeat();}},
+    ]);
+  });
+  function startAnother() {
+    Alert.alert('Set aside this attempt?', 'It may already have reached the server. Check Recently captured before saving the same item again.', [
+      {text: 'Keep this attempt', style: 'cancel'},
+      {text: 'Start another', onPress: () => {setPending(null);setMessage('Previous save may have succeeded. Check Recently captured before saving it again.');}},
+    ]);
+  }
   async function save(intent: Intent) {
     if(lock.current) return;
     lock.current=true; setBusy(true); setPending(intent); setMessage('Saving your source…');
@@ -26,9 +46,10 @@ export default function Capture() {
         : memoriesApi.upload(access,intent.uri!,intent.mime!,intent.name!,intent.key));
       if(intent.uri) { try {new File(intent.uri).delete();} catch {} }
       setPending(null);
+      setLeaving(true); release();
       // Navigate immediately after the capture API confirms durable storage.
       router.replace({pathname:'/(account)/memory/[id]',params:{id:saved.id,saved:'1'}});
-    } catch {setMessage('Could not confirm this save. Retry sends the same request safely. Check file type, size and your connection.');}
+    } catch {setMessage('Save not confirmed. Keep this screen open to retain your input; retry reuses the same request. There is no durable in-app offline outbox. Check file type, size and your connection.');}
     finally {lock.current=false; setBusy(false);}
   }
   async function choose(camera: boolean) {
@@ -73,15 +94,17 @@ export default function Capture() {
       setMessage('Could not open that file. Try selecting it again from Files.');
     }
   }
-  return <Screen><TextAction label="Back to library" disabled={busy} onPress={() => router.back()}/>
-    <Type title>Keep something.</Type><Notice>{message}</Notice>
+  return <Screen><TextAction label="Cancel capture" disabled={busy} onPress={() => router.back()}/>
+    <Type title>{imageOnly ? 'Save a photo.' : pdfOnly ? 'Save a document.' : 'Keep something.'}</Type><Notice>{message}</Notice>
     {pending ? <><Button label="Retry this save" busy={busy} onPress={() => void save(pending)}/>
-      <TextAction label="Start another capture" disabled={busy} onPress={() => {setPending(null);setMessage('Previous save may have succeeded. Check the library before saving it again.');}}/></> : <>
-      <Input label="Public article URL" value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" maxLength={4096} placeholder="https://…"/>
+      <TextAction label="Start another capture" disabled={busy} onPress={startAnother}/></> : <>
+      {!imageOnly && !pdfOnly && <><Input label="Public article URL" value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" maxLength={4096} placeholder="https://…"/>
       <Button label="Save URL" disabled={!/^https?:\/\//i.test(url.trim())} busy={busy} onPress={() => void save({key:Crypto.randomUUID(),url:url.trim()})}/>
-      <Button label="Choose image or screenshot" disabled={busy} onPress={() => void choose(false)}/>
-      <Button label="Take a photo" disabled={busy} onPress={() => void choose(true)}/>
-      <Button label="Choose PDF" disabled={busy} onPress={() => void document('pdf')}/>
+      </>}
+      {!pdfOnly && <><Button label="Choose image or screenshot" disabled={busy} onPress={() => void choose(false)}/>
+      <Button label="Take a photo" disabled={busy} onPress={() => void choose(true)}/></>}
+      {!imageOnly && <Button label="Choose PDF" disabled={busy} onPress={() => void document('pdf')}/>}
+      {pdfOnly && <Type muted>Only PDF documents are supported. Other document formats are not uploaded.</Type>}
       <Type muted>Restricted pages retain their URL and available metadata. Images are saved as originals; text recognition is not available yet.</Type>
     </>}
   </Screen>;

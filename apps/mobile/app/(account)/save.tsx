@@ -1,5 +1,5 @@
 import React from 'react';
-import {Pressable, Text, View} from 'react-native';
+import {Pressable, ScrollView, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import {Type, tokens, usePalette} from '../../src/ui';
@@ -7,31 +7,32 @@ import {Type, tokens, usePalette} from '../../src/ui';
 type CaptureOption = {
   key: string; icon: string; title: string; subtitle: string; route:
     '/(account)/new-link' | '/(account)/new' | '/(account)/capture';
+  method?: 'image' | 'pdf';
 };
 
 const options: CaptureOption[] = [
   {key: 'URL', icon: '↗', title: 'Paste a link', subtitle: 'Articles, websites and saved links', route: '/(account)/new-link'},
   {key: 'NOTE', icon: '✎', title: 'Write a note', subtitle: 'A thought or something to remember', route: '/(account)/new'},
-  {key: 'IMG', icon: '▧', title: 'Photo or screenshot', subtitle: 'Choose a saved image or use the camera', route: '/(account)/capture'},
-  {key: 'PDF', icon: '▤', title: 'PDF', subtitle: 'Choose a document from your files', route: '/(account)/capture'},
+  {key: 'IMG', icon: '▧', title: 'Photo or screenshot', subtitle: 'Choose a saved image or use the camera', route: '/(account)/capture', method: 'image'},
+  {key: 'PDF', icon: '▤', title: 'File or document', subtitle: 'PDF documents up to 8 MiB', route: '/(account)/capture', method: 'pdf'},
 ];
 
 /**
- * In-app Save choices. The external OS share-sheet receiver belongs to UX-010+
- * and must not be implied by this screen.
+ * Reuse real capture flows. Replacing the sheet keeps it out of the composer's
+ * back stack; cancelling a composer returns to its original destination.
  */
 export default function SaveSomething() {
   const p = usePalette();
   return <View style={{flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.36)'}}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close save options"
       onPress={() => router.back()} style={{position: 'absolute', top: 0, right: 0, bottom: 0, left: 0}}/>
-    <SafeAreaView edges={['bottom']} style={{
+    <SafeAreaView accessibilityViewIsModal edges={['bottom', 'left', 'right']} style={{
       backgroundColor: p.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-      overflow: 'hidden', width: '100%', maxWidth: 540, alignSelf: 'center',
+      overflow: 'hidden', width: '100%', maxWidth: 540, maxHeight: '90%', alignSelf: 'center',
       elevation: 8, shadowColor: '#000000', shadowOpacity: 0.2,
       shadowOffset: {width: 0, height: -4}, shadowRadius: 12,
     }}>
-      <View style={{paddingHorizontal: tokens.space.large, paddingTop: tokens.space.compact,
+      <ScrollView contentContainerStyle={{paddingHorizontal: tokens.space.large, paddingTop: tokens.space.compact,
         paddingBottom: tokens.space.large, gap: tokens.space.small}}>
         <View importantForAccessibility="no-hide-descendants" style={{
           alignSelf: 'center', width: 38, height: 4, backgroundColor: p.line,
@@ -54,7 +55,9 @@ export default function SaveSomething() {
         </View>
         {options.map(item => <Pressable key={item.key}
           accessibilityRole="button" accessibilityLabel={item.title}
-          onPress={() => router.push(item.route)}
+          onPress={() => router.replace(item.method
+            ? {pathname: '/(account)/capture', params: {method: item.method}}
+            : item.route)}
           style={({pressed}) => ({
             minHeight: 68, borderRadius: tokens.radii.medium,
             flexDirection: 'row', alignItems: 'center', gap: tokens.space.medium,
@@ -75,11 +78,10 @@ export default function SaveSomething() {
           </View>
           <Text style={{color: p.muted, fontSize: 20}}>›</Text>
         </Pressable>)}
-        <View accessibilityLabel="Video capture is not available yet" style={{minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: tokens.space.medium, paddingHorizontal: tokens.space.compact, opacity: 0.6}}><View style={{width: 48, height: 48, borderRadius: tokens.radii.small, backgroundColor: p.surfaceMuted, alignItems: 'center', justifyContent: 'center'}}><Text style={{color: p.accent, fontSize: 24}}>▷</Text></View><View style={{flex: 1, gap: 2}}><Type variant="label">Video</Type><Type muted variant="caption">Not available yet — video uploads are unsupported</Type></View></View>
         <Type variant="caption" muted style={{textAlign: 'center', marginTop: tokens.space.small}}>
-          Files and links are saved privately to your account.
+          A connection is required. Files and links are marked saved only after confirmation.
         </Type>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   </View>;
 }

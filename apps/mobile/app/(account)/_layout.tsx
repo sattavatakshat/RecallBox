@@ -4,9 +4,17 @@ import {AppState} from 'react-native';
 import {requireOptionalNativeModule} from 'expo';
 import {View} from 'react-native';
 import {useSession} from '../../src/session';
-import {MemoryProvider} from '../../src/memories';
-import {BottomNavigation} from '../../src/navigation';
+import {MemoryProvider, useMemories} from '../../src/memories';
+import {BottomNavigation, type Destination} from '../../src/navigation';
+import {isUsableMemory} from '../../src/library-state';
 import {Notice, Screen, usePalette} from '../../src/ui';
+
+function AccountNavigation({active}: {active: Destination}) {
+  const store = useMemories();
+  const emptyLibrary = active === 'library' && !store.archived && !store.starredOnly &&
+    !store.items.some(isUsableMemory);
+  return <BottomNavigation active={active} showSave={!emptyLibrary} approved={emptyLibrary}/>;
+}
 
 export default function Protected() {
   const {account, loading} = useSession();
@@ -52,7 +60,7 @@ export default function Protected() {
           contentStyle: {backgroundColor: 'transparent'},
         }}/>
       </Stack>
-      {showTabs && <BottomNavigation active={isSearch ? 'search' : isCollections ? 'collections' : 'library'}/>}
+      {showTabs && <AccountNavigation active={isSearch ? 'search' : isCollections ? 'collections' : 'library'}/>}
     </View>
   </MemoryProvider>;
 }

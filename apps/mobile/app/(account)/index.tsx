@@ -1,11 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { MemorySummary } from '../../src/api';
 import { errorMessage, useMemories } from '../../src/memories';
-import { Button, Notice, RecoveryState, TextAction, Type, tokens, usePalette } from '../../src/ui';
+import { Button, Notice, RecoveryState, Type, tokens, usePalette } from '../../src/ui';
 import { EmptyLibrary } from '../../src/empty-library';
+import {isUsableMemory, isUnfinishedMemory, libraryMode} from '../../src/library-state';
 import { MemoryCard } from '../../src/memory-card';
 
 export default function Inbox() {
@@ -17,10 +18,10 @@ export default function Inbox() {
   // Only a finalized, usable memory belongs in the Library. An honestly
   // link-only result (metadata_only) is usable; queued/failed ones remain
   // discoverable through Recently Captured instead.
-  const usable = store.items.filter(item =>
-    item.kind === 'note' || item.processing_state === 'ready' || item.processing_state === 'metadata_only');
-  const unfinishedCount = store.items.filter(item =>
-    item.processing_state === 'queued' || item.processing_state === 'processing' || item.processing_state === 'failed').length;
+  const usable = store.items.filter(isUsableMemory);
+  const unfinished = store.items.filter(isUnfinishedMemory);
+  const unfinishedCount = unfinished.length;
+  const mode = libraryMode(store);
   const topicOf = (item: MemorySummary) =>
     item.topic_override === 'Uncategorized' ? null :
       (item.topic_override ?? item.suggested_topic ?? null);
@@ -36,6 +37,15 @@ export default function Inbox() {
     else { setTopic(label); void store.refresh(false, false).catch(() => undefined); }
   }
   useFocusEffect(useCallback(() => { void store.sync(); }, [store.sync]));
+  useEffect(() => {
+    // Look beyond a full first page of queued/failed captures before declaring
+    // an account empty. Stop as soon as a usable memory is found.
+    if (!store.archived && !store.starredOnly && store.initialized &&
+        !store.loading && !store.error && !usable.length && store.hasMore) {
+      void store.more().catch(() => undefined);
+    }
+  }, [store.archived, store.starredOnly, store.initialized, store.loading,
+    store.error, usable.length, store.hasMore, store.more]);
   async function toggle(note: MemorySummary, field: 'starred' | 'archived') {
     if (working) return;
     setWorking(note.id); setError('');
@@ -43,7 +53,13 @@ export default function Inbox() {
     catch (cause) { setError(errorMessage(cause)); void store.sync(); }
     finally { setWorking(null); }
   }
-  return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}>
+  if (mode !== 'populated' && mode !== 'filtered') return <EmptyLibrary
+    mode={mode} captures={unfinished} error={store.error} notice={store.notice}
+    refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
+    onSave={() => router.push('/(account)/save')}
+    onCaptured={() => router.push('/(account)/captured')}/>;
+
+  return <SafeAreaView edges={['top', 'left', 'right']} style={{flex: 1, backgroundColor: p.paper}}>
     <FlatList data={visible} keyExtractor={note => note.id}
       contentContainerStyle={{padding: tokens.space.large, gap: 12, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={() => void store.refresh().catch(() => undefined)}
@@ -123,14 +139,8 @@ export default function Inbox() {
                 <Button label="Back to all memories" variant="secondary"
                   onPress={() => void store.refresh(false, false).catch(() => undefined)}/>
               </View>
-            : <View style={{gap: tokens.space.medium}}>
-                {unfinishedCount > 0 && <Notice>
-                  {unfinishedCount} captured {unfinishedCount === 1 ? 'item is' : 'items are'} waiting for details.
-                  Nothing has disappeared; open Recently Captured to check.
-                </Notice>}
-                <EmptyLibrary onSave={() => router.push('/(account)/save')}
-                  onCaptured={() => router.push('/(account)/captured')}/>
-              </View>}
+            : undefined}
+
       renderItem={({item}) => <MemoryCard
         memory={item} busy={Boolean(working)}
         onOpen={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}

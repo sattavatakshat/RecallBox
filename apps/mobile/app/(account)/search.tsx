@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {View} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {useMemories} from '../../src/memories';
+import {isUsableMemory, libraryMode} from '../../src/library-state';
 import {Button, Input, Screen, TextAction, Type} from '../../src/ui';
 
 /**
@@ -14,9 +15,10 @@ export default function Search() {
   const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
   const store = useMemories();
   const suggestions = store.items.filter(item =>
-    item.title.trim() && (item.kind === 'note' ||
-      item.processing_state === 'ready' || item.processing_state === 'metadata_only'))
+    item.title.trim() && isUsableMemory(item))
     .slice(0,4);
+  const mode = libraryMode(store);
+  const emptyLibrary = mode === 'empty';
 
   function submit(value = query) {
     const q = value.trim();
@@ -33,12 +35,18 @@ export default function Search() {
       placeholder="That Goa guide, Java tutorial…"/>
     <Button label="Search library" disabled={!query.trim()} onPress={() => submit()}/>
     <View style={{gap:8,marginTop:16}}>
-      <Type variant="section">{suggestions.length ? 'From your Library' : 'Search what you saved'}</Type>
+      <Type variant="section">{suggestions.length ? 'From your Library' :
+        emptyLibrary ? 'Your Library is empty.' :
+          mode === 'pending' ? 'No searchable saves yet.' : 'Search what you saved'}</Type>
       {suggestions.length ? suggestions.map(item =>
         <View key={item.id} style={{gap:4}}>
           <TextAction label={item.title} onPress={() => submit(item.title)}/>
         </View>) :
-        <Type muted>Search by title, source, idea or phrase. Results come only from your own saved material.</Type>}
+        <Type muted>{emptyLibrary
+          ? 'Save a link, screenshot or note, then find it here. Search only returns your own saved material.'
+          : mode === 'pending'
+            ? 'Check Recently captured for processing status or retry options. Search only returns your own saved material.'
+            : 'Search by title, source, idea or phrase. Results come only from your own saved material.'}</Type>}
     </View>
     <Type muted variant="caption">Some saved links contain only a title or preview. Search cannot invent inaccessible details.</Type>
   </Screen>;
