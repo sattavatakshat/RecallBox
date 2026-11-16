@@ -7,11 +7,12 @@ import { useSession } from '../../../src/session';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { errorMessage, useMemories } from '../../../src/memories';
-import { Button, Input, Notice, Screen, TextAction, Type } from '../../../src/ui';
+import { Button, Input, Notice, Screen, TextAction, Type, usePalette } from '../../../src/ui';
 
 export default function MemoryDetail() {
   const {id, saved} = useLocalSearchParams<{id: string; saved?: string}>();
   const store = useMemories();
+  const p = usePalette();
   const {authorized} = useSession();
   const [base, setBase] = useState<Memory | null>(null);
   const [title, setTitle] = useState('');
@@ -143,28 +144,69 @@ export default function MemoryDetail() {
   const hasSource = Boolean(base && (base.source_url || ((base.kind === 'link' || base.kind === 'url') && base.content)));
   const isPending = base?.processing_state === 'queued' || base?.processing_state === 'processing';
   const hasReadableContent = Boolean(base && (base.extracted_text.trim() || (base.kind === 'note' && base.content.trim())));
-  return <Screen>
-    <TextAction label="Back to Library" onPress={() => router.replace('/(account)')}/>
-    <Type variant="eyebrow" muted>
-      {base?.kind === 'note' ? 'YOUR NOTE' : base?.kind === 'image' ? 'YOUR PHOTO'
-        : base?.kind === 'pdf' ? 'YOUR DOCUMENT' : 'SAVED MEMORY'}
-    </Type>
+  const origin = base?.source_url
+    ? base.source_url.replace(/^https?:\/\//i,'').split('/')[0]
+    : base?.kind === 'note' ? 'Your note'
+      : base?.kind === 'pdf' ? 'Saved document'
+      : base?.kind === 'image' ? 'Saved photo' : 'Saved source';
+  const glyph = base?.kind === 'note' ? '≡' : base?.kind === 'pdf' ? '▤'
+    : base?.kind === 'image' ? '▧' : '↗';
+  return <Screen compact>
+    <TextAction label="← Library" onPress={() => router.replace('/(account)')}/>
+    {base && <View importantForAccessibility="no-hide-descendants" style={{
+      height:156,borderRadius:22,backgroundColor:p.surfaceMuted,
+      alignItems:'center',justifyContent:'center'}}>
+      <Type style={{fontSize:54,color:p.accent}}>{glyph}</Type>
+    </View>}
+    <Type muted variant="caption">{origin}{base
+      ? ' · Saved '+new Date(base.created_at).toLocaleDateString(undefined,
+        {day:'numeric',month:'short',year:'numeric'})
+      : ''}</Type>
     <Type title>{base
       ? (base.title || (base.kind === 'note' ? 'A little thought.' : 'Something worth keeping.'))
       : unavailable ? 'Memory unavailable.' : 'Opening your memory…'}</Type>
-    {base && <Type muted variant="caption">
-      Saved {new Date(base.created_at).toLocaleDateString(undefined, {day:'numeric',month:'long',year:'numeric'})}
-    </Type>}
     {!!notice && <Notice kind="success">{notice}</Notice>}
     {!!error && <Notice kind="error">{error}</Notice>}
     {!base && !busy && !unavailable && <Button label="Try again" onPress={() => void load()}/>}
     {base && <>
-      {!!base.labels.length && <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        {base.labels.slice(0,5).map(label => <View key={label} style={{paddingVertical:6,paddingHorizontal:11,
-          borderRadius:16,backgroundColor:'#E1E9DA'}}>
-          <Type style={{fontSize:12,color:'#284D3B'}}>{label}</Type>
-        </View>)}
-      </View>}
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+        <View style={{borderRadius:20,paddingVertical:7,paddingHorizontal:13,
+          backgroundColor:p.surfaceMuted}}>
+          <Type variant="caption">{base.kind === 'url' || base.kind === 'link'
+            ? 'Link' : base.kind === 'pdf' ? 'PDF' : base.kind === 'image'
+              ? 'Photo' : 'Note'}</Type>
+        </View>
+        {base.processing_state === 'metadata_only' &&
+          <View style={{borderRadius:20,paddingVertical:7,paddingHorizontal:13,
+            backgroundColor:p.surfaceMuted}}><Type variant="caption">Link or preview only</Type></View>}
+      </View>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+        <TextAction label={base.starred ? '★ Starred' : '☆ Star'}
+          disabled={busy || unavailable || Boolean(conflict)}
+          onPress={() => void update({starred: !base.starred})}/>
+        <TextAction label="Organize" disabled={busy || unavailable || Boolean(conflict) || dirty}
+          onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/>
+        <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
+          onPress={() => router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}})}/>
+        <TextAction label={editing ? 'Editing' : 'Edit'} disabled={busy || unavailable || editing}
+          onPress={() => setEditing(true)}/>
+        <TextAction label={showMoreActions ? 'Fewer options' : 'More'}
+          onPress={() => setShowMoreActions(value => !value)}/>
+      </View>
+      <View style={{padding:18,borderRadius:18,backgroundColor:p.surfaceMuted,gap:9}}>
+        <Type variant="section">What we have</Type>
+        <Type muted variant="caption">{base.kind === 'note'
+          ? 'Your original note is preserved.'
+          : base.processing_state === 'metadata_only'
+            ? 'Only the original source and its available preview were saved.'
+            : base.processing_state === 'ready'
+              ? 'Text was extracted from the accessible source.'
+              : 'The source is saved, but extraction is not complete.'}</Type>
+        <Type variant="label">{base.kind === 'note' ? 'Your original writing'
+          : base.processing_state === 'metadata_only' ? 'Limited source coverage'
+          : base.processing_state === 'ready' ? 'Available source text'
+          : 'Source details pending'}</Type>
+      </View>
       {isPending && <Notice>
         Your source was saved. It's still being processed and is available in Recently Captured.
       </Notice>}
@@ -230,18 +272,8 @@ export default function MemoryDetail() {
         <Notice>This memory changed on another device. Your draft remains here.</Notice>
         <TextAction label="Compare with latest" disabled={busy} onPress={() => void compare()}/>
       </>}
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        <TextAction label={base.starred ? '★ Starred' : '☆ Star'} disabled={busy || unavailable || Boolean(conflict)}
-          onPress={() => void update({starred: !base.starred})}/>
-        <TextAction label="Organize" disabled={busy || unavailable || Boolean(conflict) || dirty}
-          onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/>
-        <TextAction label="Add to collection" disabled={busy || unavailable || Boolean(conflict)}
-          onPress={() => router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}})}/>
-        <TextAction label={editing ? 'Editing' : 'Edit'} disabled={busy || unavailable || editing}
-          onPress={() => setEditing(true)}/>
-        <TextAction label={showMoreActions ? 'Fewer options' : 'More options'}
-          onPress={() => setShowMoreActions(value => !value)}/>
-      </View>
+      <Type variant="section">Useful next steps</Type>
+      <Notice>Actions that require a recipe, place or tutorial will only appear when RecallBox can verify that information. Star or organize this memory anytime.</Notice>
       {editing && <View style={{gap:16}}>
         <Type variant="section">Edit memory</Type>
         <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
