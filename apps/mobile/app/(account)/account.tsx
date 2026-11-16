@@ -31,7 +31,7 @@ export default function Account(){
 
   async function select(key:Section|'sync'|'help'){
     setError('');
-    if(key==='sync'){router.push('/(account)/captured');return;}
+    if(key==='sync'){router.push('/(account)/recovery');return;}
     if(key==='help'){
       try{await Linking.openURL('https://github.com/sattavatakshat/RecallBox/issues/new');}
       catch{setError('Could not open the feedback page on this device.');}
