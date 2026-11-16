@@ -5,7 +5,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import {ApiError} from './api';
-import {configured, oidc} from './config';
+import {configured, googleSignIn, oidc} from './config';
 import {rememberAuth, completeAuth} from './pending-auth';
 import {useSession} from './session';
 
@@ -46,7 +46,7 @@ export function useNativeLogin() {
         scopes: ['openid'], responseType: AuthSession.ResponseType.Code,
         usePKCE: true, prompt: AuthSession.Prompt.Login,
         codeChallengeMethod: AuthSession.CodeChallengeMethod.S256,
-        extraParams: {nonce},
+        extraParams: {nonce, ...(googleSignIn ? {connection: oidc.googleConnection} : {})},
       });
       const authUrl = await request.makeAuthUrlAsync(discovery);
       if (!request.codeVerifier) throw new Error('Secure sign-in unavailable.');
@@ -78,5 +78,5 @@ export function useNativeLogin() {
       setBusy(false);
     }
   }
-  return {login, busy, error, configured};
+  return {login, busy, error, configured, googleSignIn};
 }
