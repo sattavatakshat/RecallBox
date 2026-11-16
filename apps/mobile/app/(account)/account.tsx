@@ -80,9 +80,11 @@ export default function Account(){
               onPress={()=>void retry()}/>}
           </>}
           {active==='notifications'&&<>
-            <Type variant="label">Notifications are not configured yet</Type>
-            <Type muted>RecallBox does not currently promise background alerts.
-              Reminder permissions will be requested only when you opt in to a working reminder.</Type>
+            <Type variant="label">In-app reminders</Type>
+            <Type muted>Choose a future time to revisit your saved content.
+              Android notification alerts are not enabled in this beta.</Type>
+            <Button label="View reminders" variant="secondary"
+              onPress={()=>router.push('/(account)/reminders')}/>
           </>}
           {active==='appearance'&&<>
             <Type variant="label">Follow device appearance</Type>

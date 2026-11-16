@@ -151,3 +151,22 @@ export const learningApi = {
     `/learning-items/${encodeURIComponent(id)}?expected_version=${version}`,
     'DELETE',undefined,access),
 };
+
+export type Reminder = {
+  id:string;source_memory_id:string;source_title:string|null;source_url:string|null;
+  due_at:string;time_zone:string;status:'scheduled'|'completed';version:number;
+  created_at:string;updated_at:string;
+};
+export const remindersApi = {
+  list:(access:string)=>request<{items:Reminder[];has_more:boolean}>(
+    '/reminders','GET',undefined,access),
+  create:(access:string,memoryId:string,body:{request_key:string;
+    due_at:string;time_zone:string})=>request<Reminder>(
+    `/memories/${encodeURIComponent(memoryId)}/reminders`,'POST',body,access),
+  complete:(access:string,id:string,version:number)=>request<Reminder>(
+    `/reminders/${encodeURIComponent(id)}`,'PATCH',
+    {expected_version:version,status:'completed'},access),
+  remove:(access:string,id:string,version:number)=>request<void>(
+    `/reminders/${encodeURIComponent(id)}?expected_version=${version}`,
+    'DELETE',undefined,access),
+};

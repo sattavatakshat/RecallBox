@@ -23,6 +23,7 @@ from .action_options import router as action_options_router
 from .shopping import router as shopping_router
 from .trips import router as trips_router
 from .learning import router as learning_router
+from .reminders import router as reminders_router
 
 logger = logging.getLogger('recallbox')
 
@@ -192,4 +193,5 @@ def create_app():
     app.include_router(shopping_router)
     app.include_router(trips_router)
     app.include_router(learning_router)
+    app.include_router(reminders_router)
     return app

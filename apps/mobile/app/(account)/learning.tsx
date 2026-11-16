@@ -112,6 +112,9 @@ export default function LearningQueue() {
       {item.status!=='completed'&&<Button label="Mark completed"
         busy={working===item.id} disabled={!!working}
         onPress={()=>void change(item,{status:'completed'})}/>}
+      <TextAction label="Set a reminder" disabled={!!working}
+        onPress={()=>router.push({pathname:'/(account)/reminder',
+          params:{memoryId:item.source_memory_id}})}/>
       <View style={{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
         <TextAction label="Move up" disabled={index===0||!!working}
           onPress={()=>void change(item,{move:'up'})}/>
