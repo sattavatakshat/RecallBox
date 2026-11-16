@@ -10,20 +10,7 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useSession} from './session';
 import {useNativeLogin} from './use-native-login';
 import {welcomeTheme, welcomeTokens as t} from './welcome-theme';
-
-/** Small code-native brand mark; decorative and hidden from screen readers. */
-function Bookmark({color, background}: {color: string; background: string}) {
-  return <View style={[styles.logo, {backgroundColor: background}]}
-    accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-    <View style={{width: 19, height: 24, borderWidth: 2, borderColor: color,
-      borderRadius: 3, borderBottomWidth: 0}}>
-      <View style={{position: 'absolute', bottom: -1, left: -1, width: 11, height: 2,
-        backgroundColor: color, transform: [{rotate: '-33deg'}]}}/>
-      <View style={{position: 'absolute', bottom: -1, right: -1, width: 11, height: 2,
-        backgroundColor: color, transform: [{rotate: '33deg'}]}}/>
-    </View>
-  </View>;
-}
+import {BrandLockup} from './brand';
 
 /** Shared by / and /sign-in. Authentication remains in the existing PKCE hook. */
 export default function Welcome() {
@@ -65,10 +52,7 @@ export default function Welcome() {
       <View style={styles.content}>
         <ScrollView style={styles.root} showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.body, {paddingTop: compact ? 24 : Math.min(56, usableHeight * 0.065)}]}>
-          <View style={styles.brand} accessible accessibilityLabel="RecallBox">
-            <Bookmark color={p.onBrand} background={p.brand}/>
-            <Text style={[styles.wordmark, {color: p.primaryText}]}>RecallBox</Text>
-          </View>
+          <BrandLockup/>
           <View style={{marginTop: compact ? 26 : 35, alignItems: 'center'}}>
             <Text accessibilityRole="header" style={{
               color: p.primaryText, fontFamily: fontsLoaded ? t.headlineFont :
@@ -126,11 +110,6 @@ const styles = StyleSheet.create({
   center: {alignItems: 'center', justifyContent: 'center'},
   content: {flex: 1, maxWidth: t.contentWidth, width: '100%', alignSelf: 'center'},
   body: {flexGrow: 1, alignItems: 'center', paddingHorizontal: t.horizontalSpace, paddingBottom: 20},
-  brand: {flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11,
-    maxWidth: '100%'},
-  logo: {width: t.logoSize, height: t.logoSize, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center'},
-  wordmark: {fontSize: 24, fontWeight: '700', letterSpacing: -0.8, flexShrink: 1},
   description: {fontSize: 17, lineHeight: 23, letterSpacing: -0.35, textAlign: 'center'},
   illustration: {width: '100%', aspectRatio: 1.4, flexGrow: 1, maxHeight: 290,
     minHeight: 140, justifyContent: 'center'},

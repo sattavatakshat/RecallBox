@@ -4,7 +4,7 @@ import { ApiError, Memory, MemoryCreate, MemoryEdit, MemorySummary, memoriesApi 
 import { useSession } from './session';
 
 type Store = {
-  items: MemorySummary[]; archived: boolean; starredOnly: boolean; loading: boolean; error: string; hasMore: boolean; notice: string;
+  items: MemorySummary[]; archived: boolean; starredOnly: boolean; initialized: boolean; loading: boolean; error: string; hasMore: boolean; notice: string;
   refresh: (archived?: boolean, starred?: boolean) => Promise<void>; more: () => Promise<void>; sync: () => Promise<void>;
   get: (id: string) => Promise<Memory>;
   create: (body: MemoryCreate, key: string) => Promise<Memory>;
@@ -47,7 +47,8 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   const [items, setItems] = useState<MemorySummary[]>([]);
   const [archived, setArchived] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [hasMore, setHasMore] = useState(false);
@@ -84,6 +85,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
       pageCursor.current = page.next_cursor; setHasMore(Boolean(page.next_cursor));
       syncCursor.current = page.sync_cursor;
       publish();
+      setInitialized(true);
     } catch (cause) {
       if (alive.current) setError(errorMessage(cause));
       throw cause;
@@ -167,5 +169,5 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     const timer = setInterval(() => { if (AppState.currentState === 'active') void sync(); }, 30000);
     return () => { alive.current = false; records.current.clear(); syncCursor.current = null; pageCursor.current = null; listener.remove(); clearInterval(timer); };
   }, [refresh, sync]);
-  return <Context.Provider value={{items, archived, starredOnly, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove}}>{children}</Context.Provider>;
+  return <Context.Provider value={{items, archived, starredOnly, initialized, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove}}>{children}</Context.Provider>;
 }
