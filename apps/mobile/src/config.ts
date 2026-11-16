@@ -14,5 +14,10 @@ export const oidc = {
   clientId: (Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_OIDC_IOS_CLIENT_ID : process.env.EXPO_PUBLIC_OIDC_ANDROID_CLIENT_ID) ?? '',
   provider: (Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_OIDC_IOS_PROVIDER : process.env.EXPO_PUBLIC_OIDC_ANDROID_PROVIDER) ?? '',
   redirectUri: process.env.EXPO_PUBLIC_OIDC_REDIRECT_URI ?? '',
+  // Opt in only after enabling/verifying this social connection for the native client.
+  googleConnection: (Platform.OS === 'ios'
+    ? process.env.EXPO_PUBLIC_OIDC_IOS_GOOGLE_CONNECTION
+    : process.env.EXPO_PUBLIC_OIDC_ANDROID_GOOGLE_CONNECTION) ?? '',
 };
 export const configured = Boolean(oidc.issuer.startsWith('https://') && oidc.clientId && oidc.provider && oidc.redirectUri);
+export const googleSignIn = configured && oidc.googleConnection === 'google-oauth2';
