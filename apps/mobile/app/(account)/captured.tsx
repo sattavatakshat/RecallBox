@@ -132,6 +132,7 @@ export default function RecentlyCaptured() {
     {!!cursor&&!loading&&<Button label="Show older captures" variant="secondary"
       onPress={()=>void load(cursor)}/>}
     {!loading&&!cursor&&!pendingCount&&!error&&<Type muted>Nothing needs recovery right now.</Type>}
+    <TextAction label="Troubleshoot sync or session" onPress={()=>router.push('/(account)/recovery')}/>
     <Button label="Refresh capture status" variant="secondary" disabled={loading}
       onPress={()=>void load()}/>
     <Type muted variant="caption">Completed memories appear in your Library. A finished link-only preview is also usable there.</Type>
