@@ -179,7 +179,7 @@ export default function MemoryDetail() {
       {text: 'Keep memory', style: 'cancel'},
       {text: 'Delete memory', style: 'destructive', onPress: () => void (async () => {
         setBusy(true); setError(''); setNotice('');
-        try { await store.remove(id, base.version); setLeaving(true); release(); router.dismissTo('/(account)'); }
+        try { await store.remove(id, base.version); setLeaving(true); release(); if (router.canGoBack()) router.back(); else router.replace('/(account)'); }
         catch (cause) { failed(cause); }
         finally { setBusy(false); }
       })()},

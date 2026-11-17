@@ -35,14 +35,18 @@ function Evidence({evidence, title = false}: {evidence: SearchEvidence; title?: 
 }
 
 /** No thumbnail API exists: show content icons instead of arbitrary images or full-size originals. */
-export const MemoryCard = memo(function MemoryCard({memory, onOpen, onStar, busy = false, search = false}: {
-  memory: MemorySummary; onOpen: () => void; onStar: () => void; busy?: boolean; search?: boolean;
+export const MemoryCard = memo(function MemoryCard({memory, onOpen, onStar, busy = false, search = false, trailing, selection}: {
+  memory: MemorySummary; onOpen: () => void; onStar?: () => void; busy?: boolean; search?: boolean; trailing?: React.ReactNode;
+  selection?: {checked: boolean; disabled: boolean; label: string};
 }) {
   const p = useBrandTheme();
   const kind = memory.kind === 'url' ? 'link' : memory.kind;
   const evidence = search ? memory.match_evidence : null;
   return <View style={{flexDirection: 'row', alignItems: 'center', gap: tokens.space.tiny, paddingVertical: tokens.space.small, minHeight: 80}}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Open ${humanTitle(memory)}`}
+    <Pressable accessibilityRole={selection ? 'checkbox' : 'button'}
+      accessibilityLabel={selection?.label ?? `Open ${humanTitle(memory)}`}
+      accessibilityState={selection ? {checked: selection.checked, disabled: selection.disabled} : undefined}
+      disabled={selection?.disabled}
       onPress={onOpen} style={({pressed}) => ({flex: 1, flexDirection: 'row', alignItems: 'center',
         gap: tokens.space.medium, minHeight: 60, opacity: pressed ? 0.7 : 1})}>
       <SourcePlaceholder kind={kind}/>
@@ -59,9 +63,9 @@ export const MemoryCard = memo(function MemoryCard({memory, onOpen, onStar, busy
         </View>}
       </View>
     </Pressable>
-    <IconButton label={`${memory.starred ? 'Unstar' : 'Star'} ${humanTitle(memory)}`} icon="star"
+    {trailing ?? (onStar && <IconButton label={`${memory.starred ? 'Unstar' : 'Star'} ${humanTitle(memory)}`} icon="star"
       selected={memory.starred} disabled={busy} onPress={onStar} filled={memory.starred}
-      color={memory.starred ? p.favorite : p.primaryText}/>
+      color={memory.starred ? p.favorite : p.primaryText}/>)}
 
   </View>;
 });

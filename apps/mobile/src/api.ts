@@ -36,7 +36,7 @@ export type Memory = {
   suggested_topic?: string | null; suggested_topic_reason?: string | null;
 };
 export type SearchEvidence = {field: string; segments: {text: string; matched: boolean}[]};
-export type MemorySummary = Omit<Memory, 'content'> & {preview: string; match_evidence?: SearchEvidence | null};
+export type MemorySummary = Omit<Memory, 'content'> & {preview: string; collection_added_at?: string; match_evidence?: SearchEvidence | null};
 export type MemoryPage = {items: MemorySummary[]; next_cursor: string | null; sync_cursor: string};
 export type MemoryCreate = {title: string; content: string; kind?: 'note' | 'link'};
 export type MemoryEdit = {expected_version: number; title?: string; content?: string; starred?: boolean; archived?: boolean; collection?: string; topic_override?: string | null; tags_override?: string[] | null};
@@ -82,13 +82,18 @@ export type Collection = {
   updated_at: string; item_count?: number;
 };
 export type CollectionsPage = {items: Collection[]; has_more: boolean};
-export type CollectionDetail = Collection & {items: MemorySummary[]; has_more: boolean};
+export type CollectionDetail = Collection & {items: MemorySummary[]; has_more: boolean; next_cursor?: string | null};
 export const collectionsApi = {
   forMemory: (access: string, id: string) => request<{items: Collection[]}>(
     `/memories/${encodeURIComponent(id)}/collections`, 'GET', undefined, access),
   list: (access: string) => request<CollectionsPage>('/collections?limit=100', 'GET', undefined, access),
-  get: (access: string, id: string) => request<CollectionDetail>(
-    `/collections/${encodeURIComponent(id)}?limit=100`, 'GET', undefined, access),
+  get: (access: string, id: string, cursor?: string) => request<CollectionDetail>(
+    `/collections/${encodeURIComponent(id)}?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, access),
+  status: (access: string, id: string, memory_ids: string[]) => request<{items: MemorySummary[]}>(
+    `/collections/${encodeURIComponent(id)}/membership-status`, 'POST', {memory_ids}, access),
+  candidates: (access: string, id: string, q: string, cursor?: string) => request<{
+    name: string; items: (MemorySummary & {already_added: boolean})[]; next_cursor: string | null;
+  }>(`/collections/${encodeURIComponent(id)}/candidates?q=${encodeURIComponent(q)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, access),
   create: (access: string, name: string) => request<Collection>(
     '/collections', 'POST', {name}, access),
   rename: (access: string, id: string, name: string, version: number) => request<Collection>(

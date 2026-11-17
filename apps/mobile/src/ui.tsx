@@ -133,11 +133,11 @@ export function FilterChip({label, selected, onPress, disabled = false}: {
     <Type variant="chip" style={{color: selected ? p.onButton : p.primaryText}}>{label}</Type>
   </Pressable>;
 }
-export function IconButton({label, children, onPress, disabled = false, selected, icon, color, filled}: React.PropsWithChildren<{
-  label: string; onPress: () => void; disabled?: boolean; selected?: boolean; icon?: IconName; color?: string; filled?: boolean;
+export function IconButton({label, children, onPress, disabled = false, selected, icon, color, filled, buttonRef}: React.PropsWithChildren<{
+  label: string; onPress: () => void; disabled?: boolean; selected?: boolean; icon?: IconName; color?: string; filled?: boolean; buttonRef?: React.Ref<React.ComponentRef<typeof Pressable>>;
 }>) {
   const p = usePalette();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled, selected}}
+  return <Pressable ref={buttonRef} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled, selected}}
     disabled={disabled} onPress={onPress} style={({pressed}) => ({minWidth: tokens.touch, minHeight: tokens.touch,
       borderRadius: tokens.radii.full, alignItems: 'center', justifyContent: 'center',
       backgroundColor: pressed ? p.surfaceMuted : 'transparent', opacity: disabled ? 0.5 : 1})}>
