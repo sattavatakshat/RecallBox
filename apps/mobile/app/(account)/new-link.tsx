@@ -4,11 +4,12 @@ import {router, usePreventRemove} from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import {ApiError, memoriesApi} from '../../src/api';
 import {useSession} from '../../src/session';
-import {errorMessage} from '../../src/memories';
+import {errorMessage, useMemories} from '../../src/memories';
 import {Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
 export default function NewLink() {
   const {authorized} = useSession();
+  const store = useMemories();
   const palette = usePalette();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,9 +43,10 @@ export default function NewLink() {
       // The secure capture API saves the URL durably and queues honest processing.
       // The older note-style link API stored the URL without extraction.
       const saved = await authorized(access => memoriesApi.capture(access, request.url, request.key));
+      await store.finishCapture(saved);
       setLeaving(true);
       release();
-      router.replace({pathname: '/(account)/memory/[id]', params: {id: saved.id, saved: '1'}});
+      router.dismissTo('/(account)');
     } catch (cause) {
       setError(cause instanceof ApiError && cause.status === 422
         ? 'Enter a complete public http:// or https:// link without spaces or credentials.'

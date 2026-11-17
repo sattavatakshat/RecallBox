@@ -75,7 +75,7 @@ export default function Recovery(){
   }
 
   return <Screen compact>
-    <TextAction label="← Recently captured" onPress={()=>router.replace('/(account)/captured')}/>
+    <TextAction label="← Library" onPress={()=>router.dismissTo('/(account)')}/>
     <Type title>Nothing gets lost.</Type>
     <Type muted>Recover server-confirmed captures and shared links when a connection or session is interrupted.</Type>
     {!!error&&<Notice kind="error">{error}</Notice>}

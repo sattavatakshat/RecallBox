@@ -1,85 +1,59 @@
-import React from 'react';
+import React, {memo} from 'react';
 import {Pressable, Text, View} from 'react-native';
 import type {MemorySummary} from './api';
-import {IconButton, Type, usePalette} from './ui';
-
-function kindLabel(memory: MemorySummary) {
-  if (memory.kind === 'note') return 'NOTE';
-  if (memory.kind === 'pdf') return 'PDF';
-  if (memory.kind === 'image') return 'PHOTO';
-  return 'LINK';
-}
+import {useBrandTheme} from './brand';
+import {LibraryIcon} from './library-icons';
 
 function humanTitle(memory: MemorySummary) {
-  if (memory.title.trim()) return memory.title;
-  if (memory.kind === 'note') return 'Untitled note';
-  if (memory.kind === 'image') return 'Saved photo';
-  if (memory.kind === 'pdf') return 'Saved PDF';
-  return 'Saved link';
+  return memory.title.trim() || (memory.kind === 'note' ? 'Untitled note' :
+    memory.kind === 'image' ? 'Saved image' : memory.kind === 'pdf' ? 'Saved PDF' : 'Saved link');
 }
-
 function sourceName(memory: MemorySummary) {
   if (memory.kind === 'note') return 'Your note';
   if (memory.kind === 'image') return 'Image';
   if (memory.kind === 'pdf') return 'PDF';
-  const raw = memory.source_url || memory.preview;
-  const match = /^https?:\/\/([^/?#]+)/i.exec(raw);
+  const match = /^https?:\/\/([^/?#]+)/i.exec(memory.source_url || memory.preview);
   return match?.[1]?.replace(/^www\./, '') ?? 'Saved link';
 }
-
 function shortDate(iso: string) {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
+  const date = new Date(iso), today = new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const localDay = (value: Date) => Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+  const days = (localDay(today) - localDay(date)) / 86400000;
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, days > 1 && days < 7 ? {weekday: 'long'} :
+    {day: 'numeric', month: 'short', ...(date.getFullYear() !== today.getFullYear() ? {year: 'numeric'} : {})});
 }
 
-/**
- * Compact recognizable Library row. Uses real saved fields only.
- * The API does not provide thumb-sized assets, so we deliberately show a
- * source-type tile instead of downloading original-size media for a tiny card.
- */
-export function MemoryCard({memory, onOpen, onStar, busy = false}: {
-  memory: MemorySummary;
-  onOpen: () => void;
-  onStar: () => void;
-  busy?: boolean;
+/** No thumbnail API exists: show content icons instead of arbitrary images or full-size originals. */
+export const MemoryCard = memo(function MemoryCard({memory, onOpen, onStar, busy = false}: {
+  memory: MemorySummary; onOpen: () => void; onStar: () => void; busy?: boolean;
 }) {
-  const p = usePalette();
-  const meta = [kindLabel(memory), sourceName(memory)].filter(Boolean).join(' · ');
-  const effectiveTopic = memory.topic_override === 'Uncategorized'
-    ? null : (memory.topic_override ?? memory.suggested_topic ?? null);
-  const detail = [effectiveTopic, shortDate(memory.created_at), memory.collection]
-    .filter(Boolean).join(' · ');
-  return <View style={{flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: p.line, minHeight: 82}}>
+  const p = useBrandTheme();
+  const kind = memory.kind === 'url' ? 'link' : memory.kind;
+  return <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 10, minHeight: 80}}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Open ${humanTitle(memory)}`}
-      onPress={onOpen}
-      style={({pressed}) => ({flex: 1, flexDirection: 'row', alignItems: 'center',
-        gap: 12, minHeight: 64, opacity: pressed ? 0.75 : 1})}>
-      <View importantForAccessibility="no-hide-descendants" style={{
-        width: 64, height: 64, borderRadius: 12,
-        backgroundColor: memory.kind === 'note' ? '#EFE9DA'
-          : memory.kind === 'pdf' ? '#EEE1DC'
-          : memory.kind === 'image' ? '#DBE7D7' : '#EEE7E5',
-        alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Text style={{color: memory.kind === 'note' ? '#775D3F'
-          : memory.kind === 'pdf' ? '#86594D'
-          : memory.kind === 'image' ? '#42644E' : '#8C6976',
-          fontSize: 23}}>{memory.kind === 'note' ? '≡' : memory.kind === 'pdf' ? '▤' : memory.kind === 'image' ? '▧' : '↗'}</Text>
+      onPress={onOpen} style={({pressed}) => ({flex: 1, flexDirection: 'row', alignItems: 'center',
+        gap: 16, minHeight: 60, opacity: pressed ? 0.7 : 1})}>
+      <View style={{width: 60, height: 60, borderRadius: 14, backgroundColor: p.avatar,
+        alignItems: 'center', justifyContent: 'center'}}>
+        <LibraryIcon kind={kind} color={p.onAvatar}/>
       </View>
-      <View style={{flex: 1, gap: 3}}>
-        <Type variant="label" style={{fontSize: 14, lineHeight: 19, fontWeight: '700'}} numberOfLines={2}>{humanTitle(memory)}</Type>
-        <Type muted variant="caption" style={{fontSize: 11, lineHeight: 16}} numberOfLines={1}>{meta}</Type>
-        {!!detail && <Type muted variant="caption" style={{fontSize: 10, lineHeight: 15}} numberOfLines={1}>{detail}</Type>}
+      <View style={{flex: 1, gap: 4}}>
+        <Text numberOfLines={2} style={{color: p.primaryText, fontSize: 16, lineHeight: 21,
+          fontWeight: '700', letterSpacing: -0.3}}>{humanTitle(memory)}</Text>
+        <Text numberOfLines={1} style={{color: p.secondaryText, fontSize: 13, lineHeight: 19}}>
+          {[sourceName(memory), shortDate(memory.created_at)].filter(Boolean).join(' · ')}
+        </Text>
       </View>
     </Pressable>
-    <IconButton label={memory.starred ? 'Remove from Starred' : 'Add to Starred'}
-      disabled={busy} onPress={onStar}>
-      <View style={{width: 25, height: 25, alignItems: 'center', justifyContent: 'center'}}>
-        <Text style={{fontSize: 25, color: memory.starred ? '#AE7C33' : p.muted,
-          lineHeight: 29}}>{memory.starred ? '★' : '☆'}</Text>
-      </View>
-    </IconButton>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${memory.starred ? 'Unstar' : 'Star'} ${humanTitle(memory)}`}
+      accessibilityState={{selected: memory.starred, disabled: busy, busy}} disabled={busy} onPress={onStar}
+      style={({pressed}) => ({width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center',
+        opacity: busy || pressed ? 0.5 : 1})}>
+      <Text accessible={false} style={{fontSize: 30, lineHeight: 38,
+        color: memory.starred ? '#D99A26' : p.primaryText}}>{memory.starred ? '★' : '☆'}</Text>
+    </Pressable>
   </View>;
-}
+});

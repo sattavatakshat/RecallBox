@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {Linking, Pressable, View} from 'react-native';
 import {router} from 'expo-router';
+import {useMemories} from '../../src/memories';
 import {useSession} from '../../src/session';
 import {Button, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
@@ -17,6 +18,7 @@ const sections:Array<{key:Section|'sync'|'help';title:string;description:string;
 /** RB-19 settings: six real controls, no fake export/delete promises. */
 export default function Account(){
   const {account,logout,message,retry}=useSession();
+  const memories=useMemories();
   const p=usePalette();
   const [active,setActive]=useState<Section|null>(null);
   const [busy,setBusy]=useState(false);
@@ -41,7 +43,7 @@ export default function Account(){
   }
 
   return <Screen compact>
-    <TextAction label="← Library" onPress={()=>router.replace('/(account)')}/>
+    <TextAction label="← Library" onPress={()=>router.dismissTo('/(account)')}/>
     <Type title>Your RecallBox.</Type>
     <Type muted>Account and personal choices.</Type>
     {!!error&&<Notice kind="error">{error}</Notice>}
@@ -101,6 +103,12 @@ export default function Account(){
         </View>}
       </View>)}
     </View>
+    <Button label="View archived memories" variant="secondary" onPress={() => {
+      void memories.refresh(true, false, null).catch(() => undefined);
+      router.dismissTo('/(account)');
+    }}/>
+    <Button label="Review device shares" variant="secondary"
+      onPress={() => router.push('/(account)/incoming-share')}/>
     <Button label="Sign out" variant="secondary" busy={busy} onPress={()=>void leave()}/>
   </Screen>;
 }

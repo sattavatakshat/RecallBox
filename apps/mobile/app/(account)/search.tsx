@@ -27,7 +27,7 @@ export default function Search() {
   }
 
   return <Screen compact>
-    <TextAction label="← Library" onPress={() => router.replace('/(account)')}/>
+    <TextAction label="← Library" onPress={() => router.dismissTo('/(account)')}/>
     <Type title>Find it again.</Type>
     <Input label="Search your saved things" value={query} onChangeText={setQuery}
       autoFocus autoCapitalize="none" autoCorrect={false} maxLength={200}
@@ -45,7 +45,7 @@ export default function Search() {
         <Type muted>{emptyLibrary
           ? 'Save a link, screenshot or note, then find it here. Search only returns your own saved material.'
           : mode === 'pending'
-            ? 'Check Recently captured for processing status or retry options. Search only returns your own saved material.'
+            ? 'Check Library for original availability and recovery options. Search only returns your own saved material.'
             : 'Search by title, source, idea or phrase. Results come only from your own saved material.'}</Type>}
     </View>
     <Type muted variant="caption">Some saved links contain only a title or preview. Search cannot invent inaccessible details.</Type>

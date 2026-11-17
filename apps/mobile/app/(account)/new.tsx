@@ -7,7 +7,7 @@ import { errorMessage, useMemories } from '../../src/memories';
 import { Button, Input, Notice, Screen, TextAction, Type, usePalette } from '../../src/ui';
 
 export default function NewNote() {
-  const {create} = useMemories();
+  const {create, finishCapture} = useMemories();
   const palette = usePalette();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -32,9 +32,10 @@ export default function NewNote() {
     setLocked(true);
     try {
       const note = await create({title: attempt.current.title, content: attempt.current.content}, attempt.current.key);
+      await finishCapture(note);
       setLeaving(true);
       release();
-      router.replace({pathname: '/(account)/memory/[id]', params: {id: note.id, saved: '1'}});
+      router.dismissTo('/(account)');
     } catch (cause) {
       setError(errorMessage(cause));
       // Definitive validation/auth rejection did not create a note. Network/5xx

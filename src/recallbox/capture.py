@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from .auth import principal
 from .db import owned
-from .memories import memory, publish, writing
+from .memories import memory, original_column, publish, writing
 from .problems import Problem
 
 router = APIRouter(prefix='/v1')
@@ -29,7 +29,7 @@ async def store(request, who, key, kind, title, content, source=None, asset=None
                 raise Problem(409, 'idempotency_mismatch')
             if not previous['usable']:
                 raise Problem(409, 'idempotency_expired')
-            row = await conn.fetchrow('SELECT * FROM memories WHERE id=$1 AND deleted_at IS NULL', previous['response_entity_id'])
+            row = await conn.fetchrow(f'SELECT *,{original_column()} FROM memories WHERE id=$1 AND deleted_at IS NULL', previous['response_entity_id'])
             if row is None:
                 raise Problem(410, 'memory_deleted')
             return memory(row)
@@ -92,12 +92,13 @@ async def asset(memory_id: UUID, request: Request, who=Depends(principal)):
 @router.post('/memories/{memory_id}/retry')
 async def retry(memory_id: UUID, request: Request, who=Depends(principal)):
     async with writing(request, who) as conn:
-        row = await conn.fetchrow('SELECT * FROM memories WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', memory_id)
+        row = await conn.fetchrow(f'SELECT *,{original_column()} FROM memories WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', memory_id)
         if row is None:
             raise Problem(404, 'memory_not_found')
         if row['processing_state'] not in ('failed','metadata_only'):
             raise Problem(409, 'processing_not_retryable')
+        original_available = row['original_available']
         await conn.execute("UPDATE ingestion_jobs SET state='queued',attempts=0,available_at=now(),lease_until=NULL,error=NULL WHERE memory_id=$1", memory_id)
         row = await conn.fetchrow("UPDATE memories SET processing_state='queued',processing_error=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=$1 RETURNING *", memory_id)
         await publish(conn, who[0], row, 'upsert')
-        return memory(row)
+        return memory({**dict(row), 'original_available': original_available})

@@ -106,11 +106,11 @@ export function EmptyLibrary({mode, captures, deviceShares, deviceError, error, 
             </Text>
           </View>}
           {(captures.length > 0 || deviceShares > 0 || Boolean(deviceError)) && <Pressable accessibilityRole="button"
-            accessibilityLabel={`Recently captured. ${status}. Open capture status${failed ? ' and retry options' : ''}`}
+            accessibilityLabel={`Needs attention. ${status}. Open recovery${failed ? ' and retry options' : ''}`}
             onPress={onCaptured} style={({pressed}) => [styles.captureStatus,
               {borderColor: p.line, backgroundColor: p.surface, opacity: pressed ? 0.7 : 1}]}>
             <View style={{flex: 1, gap: 4}}>
-              <Text style={{color: p.primaryText, fontSize: 15, lineHeight: 21, fontWeight: '600'}}>Recently captured</Text>
+              <Text style={{color: p.primaryText, fontSize: 15, lineHeight: 21, fontWeight: '600'}}>Needs attention</Text>
               <Text style={[styles.status, {color: p.secondaryText}]}>{status}</Text>
               {failed > 0 && <Text style={[styles.status, {color: p.error}]}>View details and retry processing</Text>}
             </View>

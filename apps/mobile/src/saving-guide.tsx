@@ -25,7 +25,7 @@ export function SavingGuide({visible, onClose}: {visible: boolean; onClose: () =
               2. If RecallBox appears in the share menu, select it to send the web link. Sign in if asked.
             </Text>
             <Text style={[styles.copy, {color: p.secondaryText}]}>
-              3. Check your Library or Recently captured for the confirmed save and its status.
+              3. Find your confirmed save in Library. Source details can continue processing there.
             </Text>
             <Text style={[styles.copy, {color: p.secondaryText}]}>
               Don’t see RecallBox? Copy the link, then use Save something → Paste a link.

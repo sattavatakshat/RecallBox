@@ -27,7 +27,7 @@ export default function ShareInbox() {
       <Type muted variant="caption">{item.kind} · Saved on this device · {item.blocked ? 'Needs attention' : 'Waiting to sync'}</Type>
       {!!item.error && <Notice>{item.error}</Notice>}
       <TextAction label="Remove local copy" onPress={() => Alert.alert('Remove this device copy?',
-        'An earlier request may already have reached the server. Check Recently captured before sharing again.',[
+        'An earlier request may already have reached the server. Check Library before sharing again.',[
           {text:'Keep',style:'cancel'},
           {text:'Remove',style:'destructive',onPress:() => {void inbox.discard(item.key).catch(() => undefined);}},
         ])}/>

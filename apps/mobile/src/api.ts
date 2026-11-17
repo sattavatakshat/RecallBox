@@ -29,6 +29,7 @@ export const api = {
 export type Memory = {
   id: string; kind: 'note' | 'link' | 'url' | 'image' | 'pdf'; title: string; content: string; version: number;
   starred: boolean; archived: boolean; created_at: string; updated_at: string;
+  original_available?: boolean;
   source_url: string | null; extracted_text: string; processing_state: 'queued' | 'processing' | 'ready' | 'metadata_only' | 'failed';
   processing_error: string | null; labels: string[]; collection: string;
   topic_override?: string | null; tags_override?: string[] | null;
@@ -58,8 +59,9 @@ export const memoriesApi = {
   search: (access: string, q: string, mode='keyword', collection?: string, starred=false) => request<{items: MemorySummary[]; pending_index: number}>(
     `/search?q=${encodeURIComponent(q)}&mode=${mode}&starred=${starred}${collection ? `&collection=${encodeURIComponent(collection)}`:''}`, 'GET', undefined, access),
   collections: (access: string) => request<{items:{collection:string;count:number}[]}>('/collection-labels','GET',undefined,access),
-  list: (access: string, archived: boolean, cursor?: string, starredOnly = false) => request<MemoryPage>(
-    `/memories?archived=${archived}&limit=20${starredOnly ? '&starred=true' : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, access),
+  topics: (access: string) => request<{items: {topic: string; count: number}[]}>('/memory-topics', 'GET', undefined, access),
+  list: (access: string, archived: boolean, cursor?: string, starredOnly = false, topic: string | null = null, order: 'newest' | 'oldest' = 'newest') => request<MemoryPage>(
+    `/memories?archived=${archived}&limit=20&order=${order}${topic ? `&topic=${encodeURIComponent(topic)}` : ''}${starredOnly ? '&starred=true' : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, 'GET', undefined, access),
   get: (access: string, id: string) => request<Memory>(`/memories/${encodeURIComponent(id)}`, 'GET', undefined, access),
   create: (access: string, body: MemoryCreate, key: string) => request<Memory>(
     '/memories', 'POST', body, access, {'Idempotency-Key': key}),

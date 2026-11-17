@@ -3,14 +3,13 @@ import {View} from 'react-native';
 import {useSession} from '../../src/session';
 import {MemoryProvider, useMemories} from '../../src/memories';
 import {BottomNavigation, type Destination} from '../../src/navigation';
-import {isUsableMemory} from '../../src/library-state';
 import {Notice, Screen, usePalette} from '../../src/ui';
 
 function AccountNavigation({active}: {active: Destination}) {
   const store = useMemories();
   const emptyLibrary = active === 'library' && !store.archived && !store.starredOnly &&
-    !store.items.some(isUsableMemory);
-  return <BottomNavigation active={active} showSave={!emptyLibrary} approved={emptyLibrary}/>;
+    !store.topic && !store.items.length;
+  return <BottomNavigation active={active} showSave={!emptyLibrary} approved={active === 'library'}/>;
 }
 
 export default function Protected() {

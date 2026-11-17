@@ -112,9 +112,24 @@ def memory(row, *, detail=True):
     for key in ('source_url', 'processing_state', 'processing_error', 'labels', 'collection',
                 'topic_override', 'tags_override', 'suggested_topic', 'suggested_topic_reason'):
         result[key] = row[key]
+    # A response is emitted only after the owning transaction commits. File
+    # mutations inherit that atomic-upload guarantee; reads check actual assets.
+    result['original_available'] = row.get('original_available', True)
+    if row['kind'] in ('url', 'link'):
+        result['original_available'] = bool(row['source_url'] or row['user_note'])
     if detail:
         result['extracted_text'] = row['extracted_text']
     return jsonable_encoder(result)
+
+
+def original_column(prefix='memories.'):
+    return (f"CASE WHEN {prefix}kind IN ('image','pdf') THEN EXISTS("
+            f"SELECT 1 FROM capture_assets a WHERE a.memory_id={prefix}id "
+            f"AND a.owner_id={prefix}owner_id) ELSE true END AS original_available")
+
+
+def effective_topic(prefix=''):
+    return f"NULLIF(coalesce({prefix}topic_override,{prefix}suggested_topic),'Uncategorized')"
 
 
 def summary_columns(*, prefix=''):
@@ -122,7 +137,7 @@ def summary_columns(*, prefix=''):
                'updated_at', 'source_url', 'processing_state', 'processing_error', 'labels',
                'collection', 'topic_override', 'tags_override',
                'suggested_topic', 'suggested_topic_reason')
-    return ','.join(prefix + column for column in columns) + f',left({prefix}user_note,200) AS user_note'
+    return ','.join(prefix + column for column in columns) + f',left({prefix}user_note,200) AS user_note,' + original_column(prefix or 'memories.')
 
 
 @asynccontextmanager
@@ -186,7 +201,9 @@ async def create_note(body: CreateNote, request: Request,
 @router.get('/memories')
 async def list_notes(request: Request, cursor: str | None = Query(default=None, max_length=4096),
                      limit: int = Query(default=20, ge=1, le=50), archived: bool = False,
-                     starred: bool | None = None, who=Depends(principal)):
+                     starred: bool | None = None,
+                     topic: str | None = Query(default=None, max_length=48),
+                     order: Literal['newest', 'oldest'] = 'newest', who=Depends(principal)):
     owner = who[0]
     async with owned(request.app.state.pool, owner, isolation='repeatable_read', readonly=True) as conn:
         user = await conn.fetchrow('SELECT sync_sequence,sync_epoch FROM users WHERE id=$1', owner)
@@ -196,6 +213,7 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
             state = decode(request.app.state.settings, cursor, owner, user['sync_epoch'], 'list')
             try:
                 if (state['archived'] != archived or state.get('starred') != starred
+                        or state.get('topic') != topic or state.get('order', 'newest') != order
                         or type(state['high']) is not int or not 0 <= state['high'] <= high):
                     raise ValueError()
                 high = state['high']
@@ -204,19 +222,31 @@ async def list_notes(request: Request, cursor: str | None = Query(default=None, 
                     raise ValueError()
             except (KeyError, TypeError, ValueError):
                 raise Problem(400, 'invalid_cursor') from None
+        direction, comparison = ('DESC', '<') if order == 'newest' else ('ASC', '>')
         rows = await conn.fetch(f'''SELECT {summary_columns()} FROM memories WHERE owner_id=$1 AND deleted_at IS NULL
             AND archived=$2 AND ($3::boolean IS NULL OR starred=$3) AND created_sequence<=$4
-            AND ($5::timestamptz IS NULL OR (created_at,id)<($5,$6::uuid))
-            ORDER BY created_at DESC,id DESC LIMIT $7''', owner, archived, starred, high, before_time, before_id, limit+1)
+            AND ($5::timestamptz IS NULL OR (created_at,id){comparison}($5,$6::uuid))
+            AND ($8::text IS NULL OR {effective_topic()}=$8)
+            ORDER BY created_at {direction},id {direction} LIMIT $7''', owner, archived, starred, high, before_time, before_id, limit+1, topic)
         page = rows[:limit]
         next_cursor = None
         if len(rows) > limit:
             last = page[-1]
             next_cursor = encode(request.app.state.settings, owner, user['sync_epoch'], 'list',
-                                 high=high, archived=archived, starred=starred,
+                                 high=high, archived=archived, starred=starred, topic=topic, order=order,
                                  before_time=last['created_at'].isoformat(), before_id=str(last['id']))
         return {'items': [memory(row, detail=False) for row in page], 'next_cursor': next_cursor,
                 'sync_cursor': encode(request.app.state.settings, owner, user['sync_epoch'], 'sync', after=high)}
+
+
+@router.get('/memory-topics')
+async def memory_topics(request: Request, who=Depends(principal)):
+    # Aggregate in SQL, never download a library to discover its filters.
+    async with owned(request.app.state.pool, who[0], readonly=True) as conn:
+        rows = await conn.fetch(f'''SELECT {effective_topic()} AS topic, count(*) AS count
+            FROM memories WHERE owner_id=$1 AND deleted_at IS NULL AND NOT archived
+            GROUP BY 1 HAVING {effective_topic()} IS NOT NULL ORDER BY count(*) DESC, topic''', who[0])
+        return {'items': [dict(row) for row in rows]}
 
 
 @router.get('/search')
@@ -257,7 +287,7 @@ async def collections(request: Request, who=Depends(principal)):
 @router.get('/memories/{memory_id}')
 async def get_note(memory_id: UUID, request: Request, who=Depends(principal)):
     async with owned(request.app.state.pool, who[0]) as conn:
-        row = await conn.fetchrow('SELECT * FROM memories WHERE id=$1 AND deleted_at IS NULL', memory_id)
+        row = await conn.fetchrow(f'SELECT *,{original_column()} FROM memories WHERE id=$1 AND deleted_at IS NULL', memory_id)
         if row is None:
             raise Problem(404, 'memory_not_found')
         return memory(row)
@@ -266,7 +296,7 @@ async def get_note(memory_id: UUID, request: Request, who=Depends(principal)):
 @router.patch('/memories/{memory_id}')
 async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depends(principal)):
     async with writing(request, who) as conn:
-        row = await conn.fetchrow('SELECT * FROM memories WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', memory_id)
+        row = await conn.fetchrow(f'SELECT *,{original_column()} FROM memories WHERE id=$1 AND deleted_at IS NULL FOR UPDATE', memory_id)
         if row is None:
             raise Problem(404, 'memory_not_found')
         if row['version'] != body.expected_version:
@@ -292,7 +322,7 @@ async def edit_note(memory_id: UUID, body: EditNote, request: Request, who=Depen
             await conn.execute('UPDATE memories SET embedding=NULL,embedding_version=NULL WHERE id=$1',memory_id)
             await conn.execute("""INSERT INTO ingestion_jobs(owner_id,memory_id) VALUES($1,$2)
               ON CONFLICT(owner_id,memory_id) DO UPDATE SET state='queued',attempts=0,available_at=now(),lease_until=NULL,lease_id=NULL""",who[0],memory_id)
-        return memory(updated)
+        return memory({**dict(updated), 'original_available': row['original_available']})
 
 
 @router.delete('/memories/{memory_id}', status_code=204)

@@ -60,12 +60,12 @@ export default function MemoryDetail() {
   useEffect(() => {
     let active=true;
     setImageSource(null);setImageError(false);setViewingImage(false);
-    if(base?.kind==='image' && ['ready','metadata_only'].includes(base.processing_state)) {
+    if(base?.kind==='image' && base.original_available !== false) {
       void authorized(async token => ({uri:`${apiURL()}/v1/memories/${base.id}/asset`,headers:{Authorization:`Bearer ${token}`},cache:'reload' as const}))
         .then(source => {if(active) setImageSource(source);}).catch(() => {if(active) setImageError(true);});
     }
     return () => {active=false;};
-  }, [base?.id,base?.kind,base?.processing_state]);
+  }, [base?.id,base?.kind,base?.original_available]);
   useEffect(() => {
     if (!base || !['queued','processing'].includes(base.processing_state) || dirty || editing) return;
     // Quiet polling must not disable a reader's controls or flash a loader.
@@ -123,7 +123,7 @@ export default function MemoryDetail() {
       {text: 'Keep memory', style: 'cancel'},
       {text: 'Delete memory', style: 'destructive', onPress: () => void (async () => {
         setBusy(true); setError('');
-        try { await store.remove(id, base.version); setLeaving(true); release(); router.replace('/(account)'); }
+        try { await store.remove(id, base.version); setLeaving(true); release(); router.dismissTo('/(account)'); }
         catch (cause) { failed(cause); }
         finally { setBusy(false); }
       })()},
@@ -152,7 +152,7 @@ export default function MemoryDetail() {
   const glyph = base?.kind === 'note' ? '≡' : base?.kind === 'pdf' ? '▤'
     : base?.kind === 'image' ? '▧' : '↗';
   return <Screen compact>
-    <TextAction label="← Library" onPress={() => router.replace('/(account)')}/>
+    <TextAction label="← Library" onPress={() => router.dismissTo('/(account)')}/>
     {base && <View importantForAccessibility="no-hide-descendants" style={{
       height:156,borderRadius:22,backgroundColor:p.surfaceMuted,
       alignItems:'center',justifyContent:'center'}}>
@@ -208,11 +208,15 @@ export default function MemoryDetail() {
           : 'Source details pending'}</Type>
       </View>
       {isPending && <Notice>
-        Your source was saved. It's still being processed and is available in Recently Captured.
+        Your original is saved in Library. Source details are still being processed.
       </Notice>}
       {base.processing_state === 'failed' && <Notice kind="error">
-        We kept your source, but couldn't finish processing it. Retry below.
+        Source details could not be processed. You can retry getting details below.
       </Notice>}
+      {base.original_available === false && <View style={{gap: 8}}>
+        <Notice kind="error">The original file is unavailable on the server. Save another copy if you still have it.</Notice>
+        <Button variant="secondary" label="Save another copy" onPress={() => router.push('/(account)/save')}/>
+      </View>}
       {base.kind === 'image' && imageSource && !imageError && <>
         <Pressable accessibilityRole="button" accessibilityLabel="View saved photo full screen"
           onPress={() => setViewingImage(true)} style={({pressed}) => ({

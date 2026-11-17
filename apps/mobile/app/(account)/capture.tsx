@@ -6,6 +6,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { memoriesApi, Memory } from '../../src/api';
+import {useMemories} from '../../src/memories';
 import { useSession } from '../../src/session';
 import { Button, Input, Notice, Screen, TextAction, Type } from '../../src/ui';
 
@@ -16,6 +17,7 @@ export default function Capture() {
   const imageOnly = method === 'image';
   const pdfOnly = method === 'pdf';
   const {authorized} = useSession();
+  const store = useMemories();
   const [url,setUrl] = useState('');
   const [busy,setBusy] = useState(false);
   const [message,setMessage] = useState('Articles, screenshots, photos and PDFs. Originals are saved privately. Files up to 8 MiB.');
@@ -25,16 +27,16 @@ export default function Capture() {
   const release = usePreventRemove((Boolean(pending || url.trim()) || busy) && !leaving, ({repeat}) => {
     if (lock.current) {Alert.alert('Save in progress', 'Wait for the save request to finish.');return;}
     Alert.alert('Leave this capture?', pending
-      ? 'The save is not confirmed. Retry safely here, or check Recently captured before saving again. This draft is only on this screen.'
+      ? 'The save is not confirmed. Retry safely here, or check Library before saving again. This draft is only on this screen.'
       : 'This link has not been saved. Leaving discards your entry.', [
       {text: 'Keep editing', style: 'cancel'},
       {text: 'Leave', style: 'destructive', onPress: () => {setLeaving(true);release();repeat();}},
     ]);
   });
   function startAnother() {
-    Alert.alert('Set aside this attempt?', 'It may already have reached the server. Check Recently captured before saving the same item again.', [
+    Alert.alert('Set aside this attempt?', 'It may already have reached the server. Check Library before saving the same item again.', [
       {text: 'Keep this attempt', style: 'cancel'},
-      {text: 'Start another', onPress: () => {setPending(null);setMessage('Previous save may have succeeded. Check Recently captured before saving it again.');}},
+      {text: 'Start another', onPress: () => {setPending(null);setMessage('Previous save may have succeeded. Check Library before saving it again.');}},
     ]);
   }
   async function save(intent: Intent) {
@@ -44,11 +46,12 @@ export default function Capture() {
       const saved: Memory = await authorized(access => intent.url
         ? memoriesApi.capture(access,intent.url,intent.key)
         : memoriesApi.upload(access,intent.uri!,intent.mime!,intent.name!,intent.key));
+      await store.finishCapture(saved);
       if(intent.uri) { try {new File(intent.uri).delete();} catch {} }
       setPending(null);
       setLeaving(true); release();
       // Navigate immediately after the capture API confirms durable storage.
-      router.replace({pathname:'/(account)/memory/[id]',params:{id:saved.id,saved:'1'}});
+      router.dismissTo('/(account)');
     } catch {setMessage('Save not confirmed. Keep this screen open to retain your input; retry reuses the same request. There is no durable in-app offline outbox. Check file type, size and your connection.');}
     finally {lock.current=false; setBusy(false);}
   }

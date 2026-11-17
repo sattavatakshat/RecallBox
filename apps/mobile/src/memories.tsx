@@ -2,14 +2,18 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState } from 'react-native';
 import { ApiError, Memory, MemoryCreate, MemoryEdit, MemorySummary, memoriesApi } from './api';
 import { useSession } from './session';
+import {topicOf} from './library-state';
 
 type Store = {
   items: MemorySummary[]; archived: boolean; starredOnly: boolean; initialized: boolean; loading: boolean; error: string; hasMore: boolean; notice: string;
-  refresh: (archived?: boolean, starred?: boolean) => Promise<void>; more: () => Promise<void>; sync: () => Promise<void>;
+  topic: string | null; order: 'newest' | 'oldest'; topics: string[];
+  refresh: (archived?: boolean, starred?: boolean, topic?: string | null, order?: 'newest' | 'oldest') => Promise<void>; more: () => Promise<void>; sync: () => Promise<void>;
   get: (id: string) => Promise<Memory>;
   create: (body: MemoryCreate, key: string) => Promise<Memory>;
   edit: (id: string, body: MemoryEdit) => Promise<Memory>;
   remove: (id: string, version: number) => Promise<void>;
+  finishCapture: (memory: Memory) => Promise<void>;
+  captureRevision: number;
 };
 const Context = createContext<Store | null>(null);
 export function useMemories() {
@@ -42,8 +46,15 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   const syncCursor = useRef<string | null>(null);
   const view = useRef(false);
   const starredView = useRef(false);
+  const topicView = useRef<string | null>(null);
+  const orderView = useRef<'newest' | 'oldest'>('newest');
+  const [topic, setTopic] = useState<string | null>(null);
+  const [order, setOrder] = useState<'newest' | 'oldest'>('newest');
+  const [topics, setTopics] = useState<string[]>([]);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const polling = useRef(false);
+  const captureEpoch = useRef(0);
+  const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [items, setItems] = useState<MemorySummary[]>([]);
   const [archived, setArchived] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
@@ -52,9 +63,10 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [hasMore, setHasMore] = useState(false);
+  const [captureRevision,setCaptureRevision] = useState(0);
 
-  // Serialize list, sync and local writes, so an older response cannot overwrite
-  // a newer mutation. The provider is keyed by account ID and never writes disk.
+  // Serialize remote reads and writes. Confirmed captures publish immediately;
+  // their epoch invalidates an older list response and versions protect merges. The provider is keyed by account ID and never writes disk.
   const run = useCallback(<T,>(operation: () => Promise<T>): Promise<T> => {
     const job = queue.current.then(async () => {
       if (!alive.current) throw new ApiError(401, 'session_changed');
@@ -66,18 +78,33 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   function publish() {
     if (!alive.current) return;
     setItems([...records.current.values()].filter(note =>
-      note.archived === view.current && (!starredView.current || note.starred))
-      .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)));
+      note.archived === view.current && (!starredView.current || note.starred) &&
+      (!topicView.current || topicOf(note) === topicView.current))
+      .sort((a, b) => (orderView.current === 'newest' ? -1 : 1) *
+        (a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))));
   }
   function merge(note: MemorySummary) {
     const old = records.current.get(note.id);
     if (!old || note.version >= old.version) records.current.set(note.id, note);
   }
-  async function first(archive: boolean, stars: boolean) {
-    if (alive.current) {setLoading(true); setError('');}
+  async function updateTopics() {
     try {
-      const page = await auth.current(token => memoriesApi.list(token, archive, undefined, stars));
-      if (!alive.current) return;
+      const result = await auth.current(token => memoriesApi.topics(token));
+      if (alive.current) setTopics(result.items.map(item => item.topic));
+    } catch { /* List availability must not depend on optional topic discovery. */ }
+  }
+  async function first(archive: boolean, stars: boolean, selectedTopic = topicView.current, selectedOrder = orderView.current) {
+    view.current = archive; setArchived(archive);
+    starredView.current = stars; setStarredOnly(stars);
+    topicView.current = selectedTopic; setTopic(selectedTopic);
+    orderView.current = selectedOrder; setOrder(selectedOrder);
+    pageCursor.current = null; setHasMore(false);
+    publish();
+    if (alive.current) {setLoading(true); setError('');}
+    const epoch = captureEpoch.current;
+    try {
+      const page = await auth.current(token => memoriesApi.list(token, archive, undefined, stars, selectedTopic, selectedOrder));
+      if (!alive.current || epoch !== captureEpoch.current) return;
       records.current.clear();
       for (const note of page.items) merge(note);
       view.current = archive; setArchived(archive);
@@ -86,19 +113,22 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
       syncCursor.current = page.sync_cursor;
       publish();
       setInitialized(true);
+      await updateTopics();
     } catch (cause) {
       if (alive.current) setError(errorMessage(cause));
       throw cause;
     } finally { if (alive.current) setLoading(false); }
   }
-  const refresh = useCallback((archive?: boolean, stars?: boolean) => run(() =>
-    first(archive ?? view.current, stars ?? starredView.current)), [run]);
+  const refresh = useCallback((archive?: boolean, stars?: boolean, selectedTopic?: string | null, selectedOrder?: 'newest' | 'oldest') => run(() =>
+    first(archive ?? view.current, stars ?? starredView.current,
+      selectedTopic === undefined ? topicView.current : selectedTopic, selectedOrder ?? orderView.current)), [run]);
   const more = useCallback(() => run(async () => {
     if (!pageCursor.current) return;
     setLoading(true); setError('');
+    const epoch = captureEpoch.current;
     try {
-      const page = await auth.current(token => memoriesApi.list(token, view.current, pageCursor.current!, starredView.current));
-      if (!alive.current) return;
+      const page = await auth.current(token => memoriesApi.list(token, view.current, pageCursor.current!, starredView.current, topicView.current, orderView.current));
+      if (!alive.current || epoch !== captureEpoch.current) return;
       for (const note of page.items) merge(note);
       pageCursor.current = page.next_cursor; setHasMore(Boolean(page.next_cursor));
       // Keep the FIRST page's sync cursor: later list requests must not skip changes.
@@ -128,6 +158,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
             syncCursor.current = page.next_cursor;
             publish();
             setError('');
+            if (page.changes.length) await updateTopics();
             return page.has_more;
           } catch (cause) {
             if (cause instanceof ApiError && cause.status === 410) {
@@ -162,12 +193,28 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     await auth.current(token => memoriesApi.remove(token, id, version));
     if (alive.current) { records.current.delete(id); publish(); }
   }), [run]);
+  const finishCapture = useCallback(async (memory: Memory) => {
+    if (!alive.current) throw new ApiError(401, 'session_changed');
+    captureEpoch.current += 1;
+    merge(summary(memory));
+    view.current=false;starredView.current=false;topicView.current=null;setTopic(null);setArchived(false);setStarredOnly(false);
+    orderView.current='newest';setOrder('newest');
+    pageCursor.current=null;setHasMore(false);
+    publish();
+    const message='Saved to your Library.';
+    setNotice(message);
+    setCaptureRevision(value=>value+1);
+    if(confirmationTimer.current)clearTimeout(confirmationTimer.current);
+    confirmationTimer.current=setTimeout(()=>setNotice(current=>current===message?'':current),6000);
+    // A failed refresh must never turn an acknowledged save into a failed save.
+    void refresh(false,false,null,'newest').catch(()=>undefined);
+  },[refresh]);
   useEffect(() => {
     alive.current = true;
     void refresh().catch(() => undefined);
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void sync(); });
     const timer = setInterval(() => { if (AppState.currentState === 'active') void sync(); }, 30000);
-    return () => { alive.current = false; records.current.clear(); syncCursor.current = null; pageCursor.current = null; listener.remove(); clearInterval(timer); };
+    return () => { alive.current = false; records.current.clear(); syncCursor.current = null; pageCursor.current = null; listener.remove(); clearInterval(timer); if(confirmationTimer.current)clearTimeout(confirmationTimer.current); };
   }, [refresh, sync]);
-  return <Context.Provider value={{items, archived, starredOnly, initialized, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove}}>{children}</Context.Provider>;
+  return <Context.Provider value={{topic, order, topics, items, archived, starredOnly, initialized, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove, finishCapture, captureRevision}}>{children}</Context.Provider>;
 }

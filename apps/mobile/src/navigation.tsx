@@ -17,6 +17,13 @@ function Stroke({from, to, color}: {from: [number, number]; to: [number, number]
 }
 
 function NavIcon({kind, color}: {kind: Destination; color: string}) {
+  if (kind === 'library') return <View style={{width: 32, height: 32}}>
+    {[4, 10, 16].map(left => <View key={left} style={{position: 'absolute', left, top: 3,
+      width: 4, height: 24, borderWidth: 1.8, borderColor: color}}/>)}
+    <View style={{position: 'absolute', left: 24, top: 5, width: 4, height: 22,
+      borderWidth: 1.8, borderColor: color, transform: [{rotate: '-16deg'}]}}/>
+    <Stroke from={[2, 29]} to={[31, 29]} color={color}/>
+  </View>;
   if (kind === 'search') return <View style={{width: 32, height: 32}}>
     <View style={{position: 'absolute', left: 3, top: 2, width: 20, height: 20,
       borderWidth: 2, borderColor: color, borderRadius: 10}}/>
@@ -94,15 +101,15 @@ export function BottomNavigation({active, showSave = true, approved = false}: {
       onPress={() => router.push('/(account)/save')}
       style={({pressed}) => ({
         position: 'absolute', right: 16, bottom: insets.bottom + barHeight + 11,
-        zIndex: 5, elevation: 6, width: 53, height: 53, borderRadius: 19,
-        backgroundColor: '#284D3B', alignItems: 'center', justifyContent: 'center',
+        zIndex: 5, elevation: 6, width: 58, height: 58, borderRadius: 19,
+        backgroundColor: approved ? brand.button : legacy.accent, alignItems: 'center', justifyContent: 'center',
         shadowColor: '#1B311E', shadowOpacity: 0.21, shadowRadius: 16,
         shadowOffset: {width: 0, height: 6}, opacity: pressed ? 0.8 : 1,
       })}>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
         style={{width: 25, height: 25, alignItems: 'center', justifyContent: 'center'}}>
-        <View style={{position: 'absolute', width: 24, height: 2, backgroundColor: '#FFFFFF', borderRadius: 1}}/>
-        <View style={{position: 'absolute', height: 24, width: 2, backgroundColor: '#FFFFFF', borderRadius: 1}}/>
+        <View style={{position: 'absolute', width: 24, height: 2, backgroundColor: approved ? brand.onButton : legacy.onAccent, borderRadius: 1}}/>
+        <View style={{position: 'absolute', height: 24, width: 2, backgroundColor: approved ? brand.onButton : legacy.onAccent, borderRadius: 1}}/>
       </View>
     </Pressable>}
   </>;
