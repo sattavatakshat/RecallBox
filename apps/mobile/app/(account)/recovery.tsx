@@ -1,4 +1,5 @@
-import React, {useCallback, useRef, useState} from 'react';
+import {tokens} from '../../src/theme';
+import {useCallback, useRef, useState} from 'react';
 import {View} from 'react-native';
 import {requireOptionalNativeModule} from 'expo';
 import {router, useFocusEffect} from 'expo-router';
@@ -75,13 +76,13 @@ export default function Recovery(){
   }
 
   return <Screen compact>
-    <TextAction label="← Library" onPress={()=>router.dismissTo('/(account)')}/>
+    <TextAction icon="back" label="Library" onPress={()=>router.dismissTo('/(account)')}/>
     <Type title>Nothing gets lost.</Type>
     <Type muted>Recover server-confirmed captures and shared links when a connection or session is interrupted.</Type>
     {!!error&&<Notice kind="error">{error}</Notice>}
     {!!notice&&<Notice kind="success">{notice}</Notice>}
     {loading&&<Notice>Checking your saved captures…</Notice>}
-    <View style={{backgroundColor:p.surfaceMuted,borderRadius:16,padding:16,gap:7}}>
+    <View style={{backgroundColor:p.surfaceMuted,borderRadius: tokens.radii.medium,padding: tokens.space.medium,gap: tokens.space.small}}>
       <Type variant="label">{local?'A shared link is waiting on this device':
         'Recovery keeps server-confirmed content visible'}</Type>
       <Type muted>{local
@@ -89,14 +90,14 @@ export default function Recovery(){
         : 'RecallBox does not yet provide a general offline upload outbox. Unconfirmed files must be retried from their original source.'}</Type>
     </View>
     <Type variant="section">Waiting to sync</Type>
-    {local&&<View style={{backgroundColor:p.surface,padding:16,borderRadius:16,gap:8}}>
+    {local&&<View style={{backgroundColor:p.surface,padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.small}}>
       <Type variant="label" numberOfLines={2}>{local.url}</Type>
       <Type muted variant="caption">On this device · Not yet confirmed by the server</Type>
       <Button label="Retry saving shared link" variant="secondary"
         onPress={()=>router.push('/(account)/incoming-share')}/>
     </View>}
     {queued.slice(0,3).map(item=><View key={item.id} style={{backgroundColor:p.surface,
-      padding:16,borderRadius:16,gap:6,borderWidth:1,borderColor:p.line}}>
+      padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.tiny,borderWidth:1,borderColor:p.line}}>
       <Type variant="label" numberOfLines={2}>{item.title||item.source_url||'Saved capture'}</Type>
       <Type muted variant="caption">Already saved on the server · {item.processing_state==='queued'
         ? 'Awaiting processing':'Reading source'}</Type>
@@ -105,7 +106,7 @@ export default function Recovery(){
     </View>)}
     {!loading&&!local&&queued.length===0&&<Type muted>No server-confirmed captures waiting on this page.</Type>}
     {failed.length>0&&<View style={{backgroundColor:p.surface,
-      padding:16,borderRadius:16,gap:8}}>
+      padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.small}}>
       <Type variant="label">{failed.length} saved {failed.length===1?'capture needs':'captures need'} attention</Type>
       <Type muted>Processing failed, but the source record remains saved.</Type>
       <Button label="Retry failed capture" variant="secondary"

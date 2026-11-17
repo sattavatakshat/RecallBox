@@ -7,7 +7,9 @@
     "start": "expo start --dev-client --localhost",
     "ios": "expo run:ios",
     "android": "expo run:android",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "design:sync": "node scripts/sync-design-system.cjs",
+    "design:check": "node scripts/check-design-system.cjs"
   },
   "dependencies": {
     "expo": "58.0.23",
@@ -25,11 +27,13 @@
     "expo-sharing": "~58.0.22",
     "expo-status-bar": "~58.0.4",
     "expo-web-browser": "~58.0.7",
+    "lucide-react-native": "1.74.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-safe-area-context": "~5.11.1",
-    "react-native-screens": "~4.30.1"
+    "react-native-screens": "~4.30.1",
+    "react-native-svg": "15.16.0"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",

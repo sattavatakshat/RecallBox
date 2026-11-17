@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, ImageURISource, Linking, Modal, Pressable, Text, View } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams, usePreventRemove } from 'expo-router';
-import { ApiError, Memory, memoriesApi } from '../../../src/api';
-import { apiURL } from '../../../src/config';
-import { useSession } from '../../../src/session';
-import { File, Paths } from 'expo-file-system';
+import {tokens} from '../../../src/theme';
+import {Icon, sourceIcon} from '../../../src/icons';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {Alert, Image, ImageURISource, Linking, Modal, Pressable, View} from 'react-native';
+import {router, useFocusEffect, useLocalSearchParams, usePreventRemove} from 'expo-router';
+import {ApiError, Memory, memoriesApi} from '../../../src/api';
+import {apiURL} from '../../../src/config';
+import {useSession} from '../../../src/session';
+import {File, Paths} from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { errorMessage, useMemories } from '../../../src/memories';
-import { Button, Input, Notice, Screen, TextAction, Type, usePalette } from '../../../src/ui';
+import {errorMessage, useMemories} from '../../../src/memories';
+import {Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../../src/ui';
 
 export default function MemoryDetail() {
   const {id, saved} = useLocalSearchParams<{id: string; saved?: string}>();
@@ -149,14 +151,12 @@ export default function MemoryDetail() {
     : base?.kind === 'note' ? 'Your note'
       : base?.kind === 'pdf' ? 'Saved document'
       : base?.kind === 'image' ? 'Saved photo' : 'Saved source';
-  const glyph = base?.kind === 'note' ? '≡' : base?.kind === 'pdf' ? '▤'
-    : base?.kind === 'image' ? '▧' : '↗';
   return <Screen compact>
-    <TextAction label="← Library" onPress={() => router.dismissTo('/(account)')}/>
+    <TextAction icon="back" label="Library" onPress={() => router.dismissTo('/(account)')}/>
     {base && <View importantForAccessibility="no-hide-descendants" style={{
-      height:156,borderRadius:22,backgroundColor:p.surfaceMuted,
+      height:156,borderRadius: tokens.radii.large,backgroundColor:p.surfaceMuted,
       alignItems:'center',justifyContent:'center'}}>
-      <Type style={{fontSize:54,color:p.accent}}>{glyph}</Type>
+      <Icon name={sourceIcon(base?.kind ?? 'note')} size={tokens.geometry.iconHero} color={p.brand}/>
     </View>}
     <Type muted variant="caption">{origin}{base
       ? ' · Saved '+new Date(base.created_at).toLocaleDateString(undefined,
@@ -169,19 +169,19 @@ export default function MemoryDetail() {
     {!!error && <Notice kind="error">{error}</Notice>}
     {!base && !busy && !unavailable && <Button label="Try again" onPress={() => void load()}/>}
     {base && <>
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        <View style={{borderRadius:20,paddingVertical:7,paddingHorizontal:13,
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
+        <View style={{borderRadius: tokens.radii.button,paddingVertical: tokens.space.small,paddingHorizontal: tokens.space.compact,
           backgroundColor:p.surfaceMuted}}>
           <Type variant="caption">{base.kind === 'url' || base.kind === 'link'
             ? 'Link' : base.kind === 'pdf' ? 'PDF' : base.kind === 'image'
               ? 'Photo' : 'Note'}</Type>
         </View>
         {base.processing_state === 'metadata_only' &&
-          <View style={{borderRadius:20,paddingVertical:7,paddingHorizontal:13,
+          <View style={{borderRadius: tokens.radii.button,paddingVertical: tokens.space.small,paddingHorizontal: tokens.space.compact,
             backgroundColor:p.surfaceMuted}}><Type variant="caption">Link or preview only</Type></View>}
       </View>
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-        <TextAction label={base.starred ? '★ Starred' : '☆ Star'}
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
+        <TextAction icon="star" label={base.starred ? 'Starred' : 'Star'}
           disabled={busy || unavailable || Boolean(conflict)}
           onPress={() => void update({starred: !base.starred})}/>
         <TextAction label="Organize" disabled={busy || unavailable || Boolean(conflict) || dirty}
@@ -193,7 +193,7 @@ export default function MemoryDetail() {
         <TextAction label={showMoreActions ? 'Fewer options' : 'More'}
           onPress={() => setShowMoreActions(value => !value)}/>
       </View>
-      <View style={{padding:18,borderRadius:18,backgroundColor:p.surfaceMuted,gap:9}}>
+      <View style={{padding: tokens.space.medium,borderRadius: tokens.radii.button,backgroundColor:p.surfaceMuted,gap: tokens.space.small}}>
         <Type variant="section">What we have</Type>
         <Type muted variant="caption">{base.kind === 'note'
           ? 'Your original note is preserved.'
@@ -213,17 +213,17 @@ export default function MemoryDetail() {
       {base.processing_state === 'failed' && <Notice kind="error">
         Source details could not be processed. You can retry getting details below.
       </Notice>}
-      {base.original_available === false && <View style={{gap: 8}}>
+      {base.original_available === false && <View style={{gap: tokens.space.small}}>
         <Notice kind="error">The original file is unavailable on the server. Save another copy if you still have it.</Notice>
         <Button variant="secondary" label="Save another copy" onPress={() => router.push('/(account)/save')}/>
       </View>}
       {base.kind === 'image' && imageSource && !imageError && <>
         <Pressable accessibilityRole="button" accessibilityLabel="View saved photo full screen"
           onPress={() => setViewingImage(true)} style={({pressed}) => ({
-            opacity:pressed ? 0.78 : 1,borderRadius:18,overflow:'hidden',
+            opacity:pressed ? 0.78 : 1,borderRadius: tokens.radii.button,overflow:'hidden',
           })}>
           <Image accessibilityLabel="Saved photo preview" source={imageSource}
-            resizeMode="contain" style={{width:'100%',height:280,borderRadius:18}}
+            resizeMode="contain" style={{width:'100%',height:280,borderRadius: tokens.radii.button}}
             onError={() => setImageError(true)}/>
         </Pressable>
         <TextAction label="View photo full screen" onPress={() => setViewingImage(true)}/>
@@ -231,12 +231,12 @@ export default function MemoryDetail() {
       {imageError && <Notice>Preview unavailable. You can still open the saved original.</Notice>}
       <Modal visible={viewingImage && !!imageSource && !imageError} transparent
         animationType="fade" onRequestClose={() => setViewingImage(false)}>
-        <View style={{flex:1,backgroundColor:'#101512',justifyContent:'center',
-          paddingHorizontal:12,paddingTop:36,paddingBottom:24}}>
+        <View style={{flex:1,backgroundColor:p.mediaBackground,justifyContent:'center',
+          paddingHorizontal: tokens.space.compact,paddingTop: tokens.space.loose,paddingBottom: tokens.space.large}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Close full-screen photo"
-            onPress={() => setViewingImage(false)} style={{alignSelf:'flex-end',padding:16,
-              minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center'}}>
-            <Text style={{color:'#FFFFFF',fontSize:26}}>×</Text>
+            onPress={() => setViewingImage(false)} style={{alignSelf:'flex-end',padding: tokens.space.medium,
+              minWidth:48,minHeight: tokens.touch,alignItems:'center',justifyContent:'center'}}>
+            <Icon name="close" color={p.mediaForeground}/>
           </Pressable>
           {!!imageSource && <Image accessibilityLabel="Full-screen saved photo"
             source={imageSource} resizeMode="contain" style={{width:'100%',flex:1}}
@@ -246,12 +246,12 @@ export default function MemoryDetail() {
       {base.kind === 'pdf' && <Notice>
         This PDF is saved privately. Open it in a compatible app to read or share the original.
       </Notice>}
-      {base.kind === 'note' && !editing && <Type style={{lineHeight:27}}>
+      {base.kind === 'note' && !editing && <Type style={{}}>
         {base.content || 'No note text yet.'}
       </Type>}
-      {base.kind !== 'note' && !!base.extracted_text?.trim() && <View style={{gap:12}}>
+      {base.kind !== 'note' && !!base.extracted_text?.trim() && <View style={{gap: tokens.space.compact}}>
         <Type variant="section">From this source</Type>
-        <Type style={{lineHeight:26}}>{base.extracted_text.slice(0,6000)}</Type>
+        <Type style={{}}>{base.extracted_text.slice(0,6000)}</Type>
         {base.extracted_text.length > 6000 &&
           <Notice>Showing an excerpt. The full available text remains searchable.</Notice>}
       </View>}
@@ -281,7 +281,7 @@ export default function MemoryDetail() {
       <Button variant="secondary" label="See useful next steps" disabled={busy || unavailable || dirty}
         onPress={() => router.push({pathname:'/(account)/next-steps',
           params:{memoryId:id}})}/>
-      {editing && <View style={{gap:16}}>
+      {editing && <View style={{gap: tokens.space.medium}}>
         <Type variant="section">Edit memory</Type>
         <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
         <Input label="Collection (optional)" value={collection} onChangeText={setCollection}
@@ -292,7 +292,7 @@ export default function MemoryDetail() {
             autoCapitalize={base.kind === 'note' ? 'sentences' : 'none'}
             autoCorrect={base.kind === 'note'} multiline
             textAlignVertical="top" style={{minHeight:base.kind === 'note' ? 220 : 70}} editable={!busy}/>}
-        {conflict && <View style={{gap:12}}>
+        {conflict && <View style={{gap: tokens.space.compact}}>
           <Type variant="section">A newer version exists</Type>
           <Type muted>{conflict.title || 'Untitled memory'}</Type>
           <Notice>Your draft remains above. Review before saving.</Notice>
@@ -325,13 +325,13 @@ export default function MemoryDetail() {
         onPress={() => router.push({pathname:'/(account)/source/[id]',params:{id}})}/>
       <TextAction label={showSourceDetails ? 'Hide source details' : 'Source details'}
         onPress={() => setShowSourceDetails(current => !current)}/>
-      {showSourceDetails && <View style={{gap:8}}>
+      {showSourceDetails && <View style={{gap: tokens.space.small}}>
         <Type muted variant="caption">Type: {base.kind}</Type>
         <Type muted variant="caption">Processing: {base.processing_state.replace('_',' ')}</Type>
         <Type muted variant="caption">Version: {base.version}</Type>
         {!!base.processing_error && <Notice kind="error">{base.processing_error}</Notice>}
       </View>}
-      {showMoreActions && <View style={{gap:8,paddingTop:8}}>
+      {showMoreActions && <View style={{gap: tokens.space.small,paddingTop: tokens.space.small}}>
         <Type variant="section">More options</Type>
         <TextAction label={base.archived ? 'Restore from archive' : 'Archive memory'}
           disabled={busy || unavailable || Boolean(conflict) || dirty}

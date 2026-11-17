@@ -1,116 +1,54 @@
-import React, {useState} from 'react';
-import {Pressable, Text, View} from 'react-native';
+import {useState} from 'react';
+import {Pressable, View} from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
-import {tokens, usePalette} from './ui';
-import {useBrandTheme} from './brand';
-
+import {Icon, Type, tokens, usePalette} from './ui';
 export type Destination = 'library' | 'search' | 'collections';
-
-/** Code-native outline strokes keep the three tab icons consistent. */
-function Stroke({from, to, color}: {from: [number, number]; to: [number, number]; color: string}) {
-  const dx = to[0] - from[0], dy = to[1] - from[1];
-  const length = Math.hypot(dx, dy);
-  return <View style={{position: 'absolute', left: (from[0] + to[0] - length) / 2,
-    top: (from[1] + to[1]) / 2 - 1, width: length, height: 2, borderRadius: 1,
-    backgroundColor: color, transform: [{rotate: `${Math.atan2(dy, dx) * 180 / Math.PI}deg`}]}}/>;
-}
-
-function NavIcon({kind, color}: {kind: Destination; color: string}) {
-  if (kind === 'library') return <View style={{width: 32, height: 32}}>
-    {[4, 10, 16].map(left => <View key={left} style={{position: 'absolute', left, top: 3,
-      width: 4, height: 24, borderWidth: 1.8, borderColor: color}}/>)}
-    <View style={{position: 'absolute', left: 24, top: 5, width: 4, height: 22,
-      borderWidth: 1.8, borderColor: color, transform: [{rotate: '-16deg'}]}}/>
-    <Stroke from={[2, 29]} to={[31, 29]} color={color}/>
-  </View>;
-  if (kind === 'search') return <View style={{width: 32, height: 32}}>
-    <View style={{position: 'absolute', left: 3, top: 2, width: 20, height: 20,
-      borderWidth: 2, borderColor: color, borderRadius: 10}}/>
-    <Stroke from={[21, 21]} to={[29, 29]} color={color}/>
-  </View>;
-  return <View style={{width: 32, height: 32}}>
-    <Stroke from={[1, 9]} to={[16, 2]} color={color}/>
-    <Stroke from={[16, 2]} to={[31, 9]} color={color}/>
-    <Stroke from={[31, 9]} to={[16, 16]} color={color}/>
-    <Stroke from={[16, 16]} to={[1, 9]} color={color}/>
-    <Stroke from={[1, 17]} to={[16, 24]} color={color}/>
-    <Stroke from={[16, 24]} to={[31, 17]} color={color}/>
-    {kind === 'collections' && <>
-      <Stroke from={[1, 24]} to={[16, 31]} color={color}/>
-      <Stroke from={[16, 31]} to={[31, 24]} color={color}/>
-    </>}
-  </View>;
-}
-
 function navigate(to: Destination) {
-  // Keep real stack history and reuse a destination already in the stack.
-  // Hardware Back from a tab reached through Library can return to Library.
   if (to === 'library') router.dismissTo('/(account)');
   else if (to === 'search') router.navigate('/(account)/search');
   else router.navigate('/(account)/collections');
 }
-
-/** Only a populated/filtered Library (or another destination) needs the FAB. */
-export function BottomNavigation({active, showSave = true, approved = false}: {
-  active: Destination; showSave?: boolean; approved?: boolean;
-}) {
-  const legacy = usePalette();
-  const brand = useBrandTheme();
+export function FloatingSaveButton({bottom}: {bottom: number}) {
+  const p = usePalette();
+  return <Pressable accessibilityRole="button" accessibilityLabel="Save something"
+    onPress={() => router.push('/(account)/save')} style={({pressed}) => ({position: 'absolute',
+      right: tokens.space.medium, bottom, zIndex: 5, width: tokens.geometry.fab, height: tokens.geometry.fab,
+      borderRadius: tokens.radii.button, backgroundColor: p.button, alignItems: 'center', justifyContent: 'center',
+      shadowColor: p.shadow, ...tokens.elevation.floating, opacity: pressed ? 0.8 : 1})}>
+    <Icon name="save" size={tokens.geometry.iconLarge} color={p.onButton}/>
+  </Pressable>;
+}
+/** approved remains accepted for compatibility; all destinations now use one theme. */
+export function BottomNavigation({active, showSave = true}: {active: Destination; showSave?: boolean; approved?: boolean}) {
+  const p = usePalette();
   const insets = useSafeAreaInsets();
-  const [barHeight, setBarHeight] = useState(70);
-  const background = approved ? brand.background : legacy.paper;
-  const line = approved ? brand.line : legacy.line;
-  const selectedSurface = approved ? brand.selectedSurface : legacy.surfaceMuted;
-  const selectedInk = approved ? brand.selectedText : legacy.accent;
-  const muted = approved ? brand.secondaryText : legacy.faint;
+  const [barHeight, setBarHeight] = useState(tokens.geometry.navHeight);
   const tabs: Array<{key: Destination; label: string}> = [
-    {key: 'library', label: 'Library'},
-    {key: 'search', label: 'Search'},
-    {key: 'collections', label: 'Collections'},
+    {key: 'library', label: 'Library'}, {key: 'search', label: 'Search'}, {key: 'collections', label: 'Collections'},
   ];
   return <>
-    <SafeAreaView edges={['bottom', 'left', 'right']}
-      style={{backgroundColor: background, borderTopWidth: 1, borderColor: line}}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={{backgroundColor: p.background, borderTopWidth: tokens.geometry.divider, borderColor: p.line}}>
       <View accessibilityRole="tablist" onLayout={event => setBarHeight(event.nativeEvent.layout.height)} style={{
-        minHeight: 70, maxWidth: tokens.width, width: '100%', alignSelf: 'center',
-        flexDirection: 'row', alignItems: 'stretch', paddingHorizontal: 12,
-        gap: 4, paddingTop: 6, paddingBottom: 6,
-      }}>
+        minHeight: tokens.geometry.navHeight, maxWidth: tokens.width, width: '100%', alignSelf: 'center',
+        flexDirection: 'row', paddingHorizontal: tokens.space.compact, gap: tokens.space.tiny, paddingVertical: tokens.space.small}}>
         {tabs.map(tab => {
           const selected = active === tab.key;
-          return <Pressable key={tab.key} accessibilityRole="tab"
-            accessibilityLabel={tab.label} accessibilityState={{selected}}
-            onPress={() => {if (!selected) navigate(tab.key);}}
-            style={{flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 2}}>
+          return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={tab.label} accessibilityState={{selected}}
+            onPress={() => {if (!selected) navigate(tab.key);}} style={{flex: 1, minHeight: tokens.touch,
+              alignItems: 'center', justifyContent: 'center', gap: tokens.space.tiny}}>
             {({pressed}) => <>
-              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-                style={{minHeight: 34, width: '85%', maxWidth: 86, borderRadius: 24,
-                  alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: selected || pressed ? selectedSurface : 'transparent'}}>
-                <NavIcon kind={tab.key} color={selected ? selectedInk : muted}/>
+              <View style={{minHeight: tokens.space.sectionSmall, width: '85%', maxWidth: 88, borderRadius: tokens.radii.full,
+                alignItems: 'center', justifyContent: 'center', backgroundColor: selected || pressed ? p.selectedSurface : 'transparent'}}>
+                <Icon name={tab.key} size={tokens.geometry.iconLarge} color={selected ? p.selectedText : p.primaryText}/>
               </View>
-              <Text style={{fontSize: 12, lineHeight: 17, fontWeight: selected ? '700' : '400',
-                textAlign: 'center', color: selected ? selectedInk : muted}}>{tab.label}</Text>
+              <Type variant="nav" style={{textAlign: 'center', color: selected ? p.selectedText : p.primaryText,
+                fontWeight: selected ? tokens.type.cardTitle.fontWeight : tokens.type.nav.fontWeight}}>{tab.label}</Type>
             </>}
           </Pressable>;
         })}
       </View>
     </SafeAreaView>
-    {showSave && <Pressable accessibilityRole="button" accessibilityLabel="Save something"
-      onPress={() => router.push('/(account)/save')}
-      style={({pressed}) => ({
-        position: 'absolute', right: 16, bottom: insets.bottom + barHeight + 11,
-        zIndex: 5, elevation: 6, width: 58, height: 58, borderRadius: 19,
-        backgroundColor: approved ? brand.button : legacy.accent, alignItems: 'center', justifyContent: 'center',
-        shadowColor: '#1B311E', shadowOpacity: 0.21, shadowRadius: 16,
-        shadowOffset: {width: 0, height: 6}, opacity: pressed ? 0.8 : 1,
-      })}>
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-        style={{width: 25, height: 25, alignItems: 'center', justifyContent: 'center'}}>
-        <View style={{position: 'absolute', width: 24, height: 2, backgroundColor: approved ? brand.onButton : legacy.onAccent, borderRadius: 1}}/>
-        <View style={{position: 'absolute', height: 24, width: 2, backgroundColor: approved ? brand.onButton : legacy.onAccent, borderRadius: 1}}/>
-      </View>
-    </Pressable>}
+    {showSave && <FloatingSaveButton bottom={insets.bottom + barHeight + tokens.space.compact}/>}
   </>;
 }

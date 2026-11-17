@@ -1,4 +1,6 @@
-import React, {useCallback, useRef, useState} from 'react';
+import {tokens} from '../../src/theme';
+import {Icon} from '../../src/icons';
+import {useCallback, useRef, useState} from 'react';
 import {Alert, Linking, View} from 'react-native';
 import {router, useFocusEffect} from 'expo-router';
 import {ApiError, LearningItem, LearningStatus, learningApi} from '../../src/api';
@@ -73,7 +75,7 @@ export default function LearningQueue() {
   }
 
   return <Screen compact>
-    <TextAction label="← Back" onPress={()=>router.back()}/>
+    <TextAction icon="back" label="Back" onPress={()=>router.back()}/>
     <Type title>Learn next.</Type>
     <Type muted>Keep the useful tutorials together.</Type>
     {!!error&&<Notice kind="error">{error}</Notice>}
@@ -84,7 +86,7 @@ export default function LearningQueue() {
       <TextAction label="Refresh" disabled={loading||!!working} onPress={()=>void refresh()}/>
     </View>
     {!loading&&items.length===0&&<View style={{backgroundColor:p.surface,
-      borderRadius:16,padding:18,gap:8}}>
+      borderRadius: tokens.radii.medium,padding: tokens.space.medium,gap: tokens.space.small}}>
       <Type variant="section">Nothing in your learning queue yet.</Type>
       <Type muted>Open a saved tutorial with verified readable content, then select
         Add to learning queue from its suggested actions.</Type>
@@ -92,14 +94,14 @@ export default function LearningQueue() {
         onPress={()=>router.replace('/(account)')}/>
     </View>}
     {items.map((item,index)=><View key={item.id}
-      style={{backgroundColor:p.surface,padding:16,borderRadius:16,
-        borderWidth:1,borderColor:p.line,gap:10}}>
-      <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
-        <View style={{height:48,width:48,borderRadius:12,
+      style={{backgroundColor:p.surface,padding: tokens.space.medium,borderRadius: tokens.radii.medium,
+        borderWidth:1,borderColor:p.line,gap: tokens.space.small}}>
+      <View style={{flexDirection:'row',alignItems:'center',gap: tokens.space.compact}}>
+        <View style={{height:48,width:48,borderRadius: tokens.radii.tile,
           backgroundColor:p.surfaceMuted,alignItems:'center',justifyContent:'center'}}>
-          <Type style={{fontSize:24,color:p.accent}}>⌘</Type>
+          <Icon name="learning" color={p.brand}/>
         </View>
-        <View style={{flex:1,gap:4}}>
+        <View style={{flex:1,gap: tokens.space.tiny}}>
           <Type variant="label" numberOfLines={2}>{item.source_title||'Saved learning source'}</Type>
           <Type muted variant="caption">{item.status==='not_started'?'Not started':
             item.status==='in_progress'?'In progress':'Completed'}</Type>
@@ -115,7 +117,7 @@ export default function LearningQueue() {
       <TextAction label="Set a reminder" disabled={!!working}
         onPress={()=>router.push({pathname:'/(account)/reminder',
           params:{memoryId:item.source_memory_id}})}/>
-      <View style={{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+      <View style={{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap',gap: tokens.space.small}}>
         <TextAction label="Move up" disabled={index===0||!!working}
           onPress={()=>void change(item,{move:'up'})}/>
         <TextAction label="Move down" disabled={index===items.length-1||!!working}

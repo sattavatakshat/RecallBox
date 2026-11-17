@@ -1,15 +1,16 @@
-import React, {useEffect,useRef,useState} from 'react';
-import {Alert,Image,View} from 'react-native';
-import {router,useLocalSearchParams} from 'expo-router';
+import {tokens} from '../../src/theme';
+import {useEffect, useRef, useState} from 'react';
+import {Alert, Image, View} from 'react-native';
+import {router, useLocalSearchParams} from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import {memoriesApi} from '../../src/api';
 import {useSession} from '../../src/session';
 import {useMemories} from '../../src/memories';
 import {useBrandTheme} from '../../src/brand';
-import {useManualDraft,useCaptureExit} from '../../src/manual-save-state';
-import {CaptureFile,manualSaveError,definitiveRejection} from '../../src/manual-save-model';
-import {choosePhoto,chooseCamera,chooseDocument,inspectSelection,recoverPhoto,removeCachedSelection,selectionError} from '../../src/manual-file-picker';
-import {CaptureEditor,CaptureButton,CaptureMessage} from '../../src/manual-save-ui';
+import {useManualDraft, useCaptureExit} from '../../src/manual-save-state';
+import {manualSaveError, definitiveRejection} from '../../src/manual-save-model';
+import {choosePhoto, chooseCamera, chooseDocument, inspectSelection, recoverPhoto, removeCachedSelection, selectionError} from '../../src/manual-file-picker';
+import {CaptureEditor, CaptureButton, CaptureMessage} from '../../src/manual-save-ui';
 import {CaptureIcon} from '../../src/manual-save-icons';
 
 export default function Capture() {
@@ -89,9 +90,9 @@ function FileCapture({mode,autoPick}: {mode:'image'|'pdf'|'capture';autoPick:boo
   return <CaptureEditor title={mode==='pdf'?'Save a PDF.':mode==='image'?'Save a photo.':'Save a file.'}
     subtitle="Review your selection before saving. Files up to 8 MiB."
     onCancel={exit.cancel} busy={phase!=='idle'}>
-    {file&&<View style={{gap:14,padding:16,borderRadius:20,backgroundColor:p.surface,borderWidth:1,borderColor:p.line}}>
+    {file&&<View style={{gap: tokens.space.compact,padding: tokens.space.medium,borderRadius: tokens.radii.button,backgroundColor:p.surface,borderWidth:1,borderColor:p.line}}>
       {image?<Image key={file.uri} source={{uri:file.uri}} resizeMode="contain" accessibilityLabel={`Preview of ${file.name}`}
-        style={{width:'100%',height:220,borderRadius:12}} onError={()=>{setPreviewFailed(true);setError('This image preview could not load. Choose another image.');}}/>:
+        style={{width:'100%',height:220,borderRadius: tokens.radii.tile}} onError={()=>{setPreviewFailed(true);setError('This image preview could not load. Choose another image.');}}/>:
         <CaptureIcon kind="pdf" color={p.brand}/>}
       <CaptureMessage>{file.name}</CaptureMessage>
       <CaptureMessage>{(file.size/(1024*1024)).toFixed(2)} MiB · {file.mime}</CaptureMessage>

@@ -1,29 +1,9 @@
-import React from 'react';
-import {Image, Platform, Text, View, useColorScheme} from 'react-native';
-import {useFonts} from 'expo-font';
-import {welcomeTheme, welcomeTokens} from './welcome-theme';
+import {Image, View} from 'react-native';
+import {usePalette, tokens} from './theme';
+import {Type} from './ui';
 
-/** Shared RB-01/RB-02 identity; deliberately does not restyle legacy screens. */
-export const brandThemes = {
-  light: {...welcomeTheme.light, secondaryText: '#596B60', surface: '#FFFCF5',
-    line: '#E1E4D8', selectedSurface: '#E5EDCD', selectedText: '#164A35',
-    avatar: '#E5EDCD', onAvatar: '#204C37', scrim: 'rgba(4, 20, 12, 0.48)'},
-  dark: {...welcomeTheme.dark, secondaryText: '#BDCCBC', surface: '#163427',
-    line: '#2D4938', selectedSurface: '#254A31', selectedText: '#DCEC7C',
-    avatar: '#C4DCAE', onAvatar: '#204C37', scrim: 'rgba(0, 10, 5, 0.68)'},
-} as const;
-
-export function useBrandTheme() {
-  return useColorScheme() === 'dark' ? brandThemes.dark : brandThemes.light;
-}
-
-export function useBrandTypography() {
-  const [loaded, error] = useFonts({
-    DMSerifDisplay: require('../assets/welcome/DMSerifDisplay-Regular.ttf'),
-  });
-  return {ready: loaded || Boolean(error), fontFamily: loaded ? welcomeTokens.headlineFont :
-    Platform.select({ios: 'Georgia', android: 'serif'})};
-}
+/** Compatibility names now point to the single application design system. */
+export {palettes as brandThemes, usePalette as useBrandTheme, useTypography as useBrandTypography} from './theme';
 
 export function BookmarkLogo({size = 46, color, background}: {
   size?: number; color: string; background: string;
@@ -45,12 +25,11 @@ export function BookmarkLogo({size = 46, color, background}: {
 export function BrandLockup({logoSize = 46, wordmarkSize = 24}: {
   logoSize?: number; wordmarkSize?: number;
 }) {
-  const p = useBrandTheme();
+  const p = usePalette();
   return <View accessible accessibilityLabel="RecallBox" style={{flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center', gap: 11, maxWidth: '100%', flexShrink: 1}}>
+    alignItems: 'center', justifyContent: 'center', gap: tokens.space.compact, maxWidth: '100%', flexShrink: 1}}>
     <BookmarkLogo size={logoSize} color={p.onBrand} background={p.brand}/>
-    <Text style={{color: p.primaryText, fontSize: wordmarkSize, fontWeight: '700',
-      letterSpacing: -0.8, flexShrink: 1}}>RecallBox</Text>
+    <Type variant="wordmark" style={{fontSize: wordmarkSize, flexShrink: 1}}>RecallBox</Type>
   </View>;
 }
 

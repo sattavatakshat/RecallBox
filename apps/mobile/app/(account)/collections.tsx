@@ -1,9 +1,11 @@
-import React, {useCallback, useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, View} from 'react-native';
+import {LoadingIndicator, Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
+import {tokens} from '../../src/theme';
+import {Icon} from '../../src/icons';
+import {useCallback, useRef, useState} from 'react';
+import {Pressable, View} from 'react-native';
 import {router, useFocusEffect} from 'expo-router';
 import {ApiError, Collection, collectionsApi} from '../../src/api';
 import {useSession} from '../../src/session';
-import {Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
 export default function Collections() {
   const {authorized} = useSession();
@@ -51,7 +53,7 @@ export default function Collections() {
     <Button label={creating ? 'Close new collection' : '＋ New collection'}
       variant={creating ? 'secondary' : 'primary'}
       onPress={()=>{setCreating(current=>!current);setError('');}}/>
-    {creating && <View style={{gap:12,padding:16,borderRadius:16,backgroundColor:p.surface}}>
+    {creating && <View style={{gap: tokens.space.compact,padding: tokens.space.medium,borderRadius: tokens.radii.medium,backgroundColor:p.surface}}>
       <Type variant="section">Name your collection</Type>
       <Input label="Collection name" value={name} onChangeText={setName} maxLength={80}
         autoFocus placeholder="Weekend places, Java notes…"/>
@@ -65,8 +67,8 @@ export default function Collections() {
       <Type variant="section">Your collections</Type>
       <TextAction label="Refresh" disabled={loading||busy} onPress={()=>void refresh()}/>
     </View>
-    {loading && <ActivityIndicator accessibilityLabel="Loading collections" color={p.ink}/>}
-    {!loading && !error && items.length===0 && <View style={{gap:10,paddingVertical:32}}>
+    {loading && <LoadingIndicator accessibilityLabel="Loading collections" color={p.ink}/>}
+    {!loading && !error && items.length===0 && <View style={{gap: tokens.space.small,paddingVertical: tokens.space.sectionSmall}}>
       <Type variant="section">Start a collection.</Type>
       <Type muted>Group saved places, recipes or articles whenever it helps you find them again.</Type>
       <TextAction label="Create your first collection" onPress={()=>setCreating(true)}/>
@@ -76,22 +78,22 @@ export default function Collections() {
     {items.map(item=><Pressable key={item.id} accessibilityRole="button"
       accessibilityLabel={`Open collection ${item.name}`}
       onPress={()=>router.push({pathname:'/(account)/collection/[id]',params:{id:item.id}})}
-      style={({pressed})=>({minHeight:83,flexDirection:'row',gap:12,alignItems:'center',
-        paddingVertical:12,borderBottomWidth:1,borderBottomColor:p.line,
+      style={({pressed})=>({minHeight:83,flexDirection:'row',gap: tokens.space.compact,alignItems:'center',
+        paddingVertical: tokens.space.compact,borderBottomWidth:1,borderBottomColor:p.line,
         opacity:pressed?0.65:1})}>
       <View importantForAccessibility="no-hide-descendants" style={{
-        width:64,height:64,borderRadius:12,alignItems:'center',justifyContent:'center',
+        width:64,height:64,borderRadius: tokens.radii.tile,alignItems:'center',justifyContent:'center',
         backgroundColor:p.surfaceMuted}}>
         <View style={{width:24,height:19,alignItems:'center',justifyContent:'center'}}>
-          <View style={{position:'absolute',top:1,width:19,height:9,borderWidth:2,borderColor:p.accent,borderRadius:3,transform:[{rotate:'-9deg'}]}}/>
-          <View style={{position:'absolute',top:7,width:21,height:11,borderWidth:2,borderColor:p.accent,borderRadius:3,backgroundColor:p.surfaceMuted}}/>
+          <View style={{position:'absolute',top:1,width:19,height:9,borderWidth:2,borderColor:p.accent,borderRadius: tokens.radii.tiny,transform:[{rotate:'-9deg'}]}}/>
+          <View style={{position:'absolute',top:7,width:21,height:11,borderWidth:2,borderColor:p.accent,borderRadius: tokens.radii.tiny,backgroundColor:p.surfaceMuted}}/>
         </View>
       </View>
-      <View style={{flex:1,gap:4}}>
+      <View style={{flex:1,gap: tokens.space.tiny}}>
         <Type variant="label" numberOfLines={2}>{item.name}</Type>
         <Type muted variant="caption">{item.item_count ?? 0} saved {item.item_count===1?'item':'items'}</Type>
       </View>
-      <Type muted>›</Type>
+      <Icon name="chevron" color={p.mutedText}/>
     </Pressable>)}
     {hasMore && <Notice>Showing the newest 100 collections. Your older collections remain saved.</Notice>}
     <Type muted variant="caption">These are intentional, user-created collections. Topic filters in Library are not permanent folders.</Type>

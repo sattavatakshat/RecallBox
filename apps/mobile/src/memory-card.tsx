@@ -1,8 +1,8 @@
-import React, {memo} from 'react';
-import {Pressable, Text, View} from 'react-native';
+import {memo} from 'react';
+import {Pressable, View} from 'react-native';
 import type {MemorySummary} from './api';
 import {useBrandTheme} from './brand';
-import {LibraryIcon} from './library-icons';
+import {IconButton, SourcePlaceholder, Type, tokens} from './ui';
 
 function humanTitle(memory: MemorySummary) {
   return memory.title.trim() || (memory.kind === 'note' ? 'Untitled note' :
@@ -32,28 +32,21 @@ export const MemoryCard = memo(function MemoryCard({memory, onOpen, onStar, busy
 }) {
   const p = useBrandTheme();
   const kind = memory.kind === 'url' ? 'link' : memory.kind;
-  return <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 10, minHeight: 80}}>
+  return <View style={{flexDirection: 'row', alignItems: 'center', gap: tokens.space.tiny, paddingVertical: tokens.space.small, minHeight: 80}}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Open ${humanTitle(memory)}`}
       onPress={onOpen} style={({pressed}) => ({flex: 1, flexDirection: 'row', alignItems: 'center',
-        gap: 16, minHeight: 60, opacity: pressed ? 0.7 : 1})}>
-      <View style={{width: 60, height: 60, borderRadius: 14, backgroundColor: p.avatar,
-        alignItems: 'center', justifyContent: 'center'}}>
-        <LibraryIcon kind={kind} color={p.onAvatar}/>
-      </View>
-      <View style={{flex: 1, gap: 4}}>
-        <Text numberOfLines={2} style={{color: p.primaryText, fontSize: 16, lineHeight: 21,
-          fontWeight: '700', letterSpacing: -0.3}}>{humanTitle(memory)}</Text>
-        <Text numberOfLines={1} style={{color: p.secondaryText, fontSize: 13, lineHeight: 19}}>
+        gap: tokens.space.medium, minHeight: 60, opacity: pressed ? 0.7 : 1})}>
+      <SourcePlaceholder kind={kind}/>
+      <View style={{flex: 1, gap: tokens.space.tiny}}>
+        <Type variant="cardTitle" numberOfLines={2}>{humanTitle(memory)}</Type>
+        <Type variant="caption" muted numberOfLines={1}>
           {[sourceName(memory), shortDate(memory.created_at)].filter(Boolean).join(' · ')}
-        </Text>
+        </Type>
       </View>
     </Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${memory.starred ? 'Unstar' : 'Star'} ${humanTitle(memory)}`}
-      accessibilityState={{selected: memory.starred, disabled: busy, busy}} disabled={busy} onPress={onStar}
-      style={({pressed}) => ({width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center',
-        opacity: busy || pressed ? 0.5 : 1})}>
-      <Text accessible={false} style={{fontSize: 30, lineHeight: 38,
-        color: memory.starred ? '#D99A26' : p.primaryText}}>{memory.starred ? '★' : '☆'}</Text>
-    </Pressable>
+    <IconButton label={`${memory.starred ? 'Unstar' : 'Star'} ${humanTitle(memory)}`} icon="star"
+      selected={memory.starred} disabled={busy} onPress={onStar} filled={memory.starred}
+      color={memory.starred ? p.favorite : p.primaryText}/>
+
   </View>;
 });

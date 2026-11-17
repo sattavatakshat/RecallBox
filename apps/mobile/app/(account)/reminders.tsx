@@ -1,4 +1,5 @@
-import React, {useCallback, useRef, useState} from 'react';
+import {tokens} from '../../src/theme';
+import {useCallback, useRef, useState} from 'react';
 import {Alert, View} from 'react-native';
 import {router, useFocusEffect} from 'expo-router';
 import {ApiError, Reminder, remindersApi} from '../../src/api';
@@ -61,23 +62,23 @@ export default function Reminders(){
   }
 
   return <Screen compact>
-    <TextAction label="← Your RecallBox" onPress={()=>router.replace('/(account)/account')}/>
+    <TextAction icon="back" label="Your RecallBox" onPress={()=>router.replace('/(account)/account')}/>
     <Type title>Your reminders.</Type>
     <Type muted>Your saved memories to revisit at the time you choose.</Type>
     <Notice>These are real reminders stored in your account. RecallBox is not sending Android notification alerts in this beta.</Notice>
     {!!error&&<Notice kind="error">{error}</Notice>}
     {!!notice&&<Notice kind="success">{notice}</Notice>}
     {loading&&<Notice>Loading reminders…</Notice>}
-    {!loading&&items.length===0&&<View style={{padding:18,borderRadius:16,
-      backgroundColor:p.surface,gap:8}}>
+    {!loading&&items.length===0&&<View style={{padding: tokens.space.medium,borderRadius: tokens.radii.medium,
+      backgroundColor:p.surface,gap: tokens.space.small}}>
       <Type variant="section">No reminders yet.</Type>
       <Type muted>Open a saved memory and choose Set a reminder to add one here.</Type>
       <Button label="Browse Library" variant="secondary" onPress={()=>router.replace('/(account)')}/>
     </View>}
     <Type variant="section">Upcoming and due</Type>
     {items.filter(item=>item.status==='scheduled').map(item=><View key={item.id}
-      style={{backgroundColor:p.surface,borderRadius:16,borderWidth:1,
-        borderColor:p.line,padding:16,gap:8}}>
+      style={{backgroundColor:p.surface,borderRadius: tokens.radii.medium,borderWidth:1,
+        borderColor:p.line,padding: tokens.space.medium,gap: tokens.space.small}}>
       <Type variant="label" numberOfLines={2}>{item.source_title||'Previously saved memory'}</Type>
       <Type muted variant="caption">{dueText(item)} · {item.time_zone}</Type>
       {new Date(item.due_at).getTime()<=Date.now()&&
@@ -91,7 +92,7 @@ export default function Reminders(){
     {items.some(item=>item.status==='completed')&&<>
       <Type variant="section">Completed</Type>
       {items.filter(item=>item.status==='completed').map(item=><View key={item.id}
-        style={{backgroundColor:p.surface,borderRadius:16,padding:14,gap:6}}>
+        style={{backgroundColor:p.surface,borderRadius: tokens.radii.medium,padding: tokens.space.compact,gap: tokens.space.tiny}}>
         <Type variant="label">{item.source_title||'Saved memory'}</Type>
         <Type muted variant="caption">Completed · {dueText(item)}</Type>
         <TextAction label="Open memory" onPress={()=>router.push({

@@ -1,4 +1,6 @@
-import React, {useCallback, useRef, useState} from 'react';
+import {tokens} from '../../../src/theme';
+import {Icon} from '../../../src/icons';
+import {useCallback, useRef, useState} from 'react';
 import {Alert, Linking, Pressable, View} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams, usePreventRemove} from 'expo-router';
 import * as Crypto from 'expo-crypto';
@@ -75,7 +77,7 @@ export default function ShoppingChecklist() {
     catch{setError('Could not open the original source.');}
   }
   return <Screen compact>
-    <TextAction label="← Memory" onPress={()=> {
+    <TextAction icon="back" label="Memory" onPress={()=> {
       if(saved?.source_memory_id)router.replace({
         pathname:'/(account)/memory/[id]',params:{id:saved.source_memory_id},
       });
@@ -84,7 +86,7 @@ export default function ShoppingChecklist() {
     <Type variant="eyebrow" muted>FROM A VERIFIED RECIPE</Type>
     <Type title>Shopping list.</Type>
     <Type muted>Ingredients from {saved?.source_title||'the saved recipe'}. Edit every line before shopping.</Type>
-    <View style={{backgroundColor:p.surfaceMuted,padding:16,borderRadius:16,gap:8}}>
+    <View style={{backgroundColor:p.surfaceMuted,padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.small}}>
       <Type variant="label">Original source is kept</Type>
       <Type muted>Amounts appear only when present in the source. Unknown quantities are not invented.</Type>
       {saved&&<TextAction label="Open original source" onPress={()=>void openOriginal()}/>}
@@ -97,14 +99,14 @@ export default function ShoppingChecklist() {
         editable={!busy}/>
       <Type variant="section">Your ingredients · {items.length}</Type>
       {items.map((item,index)=><View key={item.id} style={{backgroundColor:p.surface,
-        borderRadius:14,padding:12,borderWidth:1,borderColor:p.line,gap:8}}>
-        <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
+        borderRadius: tokens.radii.tile,padding: tokens.space.compact,borderWidth:1,borderColor:p.line,gap: tokens.space.small}}>
+        <View style={{flexDirection:'row',alignItems:'center',gap: tokens.space.small}}>
           <Pressable accessibilityRole="checkbox"
             accessibilityLabel={`Mark ${item.text} ${item.checked?'not purchased':'purchased'}`}
             accessibilityState={{checked:item.checked,disabled:busy}} disabled={busy}
             onPress={()=>changeItem(item.id,{checked:!item.checked})}
             style={{width:48,height:48,alignItems:'center',justifyContent:'center'}}>
-            <Type style={{fontSize:25}}>{item.checked?'☑':'□'}</Type>
+            <Icon name={item.checked?'checked':'square'}/>
           </Pressable>
           <View style={{flex:1}}>
             <Input label={`Ingredient ${index+1}`} value={item.text}

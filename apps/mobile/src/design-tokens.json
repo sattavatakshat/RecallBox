@@ -1,0 +1,281 @@
+{
+  "colors": {
+    "light": {
+      "background": "#FCF4EA",
+      "surface": "#FFFCF5",
+      "surfaceElevated": "#FFFDF8",
+      "surfaceMuted": "#E5EDCD",
+      "scrim": "rgba(4, 20, 12, 0.48)",
+      "primaryText": "#082F23",
+      "secondaryText": "#465052",
+      "mutedText": "#596B60",
+      "inverseText": "#FFFDF5",
+      "disabledText": "#6E766B",
+      "brand": "#082F23",
+      "onBrand": "#FFF9EE",
+      "accent": "#063824",
+      "onAccent": "#FFFDF5",
+      "highlight": "#CDE65F",
+      "onHighlight": "#102A1C",
+      "selectedSurface": "#E5EDCD",
+      "selectedText": "#164A35",
+      "line": "#E1E4D8",
+      "lineSubtle": "#EAE6DC",
+      "lineFocused": "#164A35",
+      "success": "#246A4A",
+      "successSurface": "#E5EDCD",
+      "warning": "#875C17",
+      "warningSurface": "#F5E8CD",
+      "error": "#A43439",
+      "errorSurface": "#F4DEDA",
+      "information": "#365A58",
+      "informationSurface": "#E3EDE7",
+      "avatar": "#E5EDCD",
+      "onAvatar": "#204C37",
+      "decoration": "#E9EBCF",
+      "sheetSurface": "#FCF4EA",
+      "sheetLine": "#E1E4D8",
+      "iconSurface": "#E5EDCD",
+      "favorite": "#A86D12",
+      "mediaBackground": "#101512",
+      "mediaForeground": "#FFFFFF",
+      "identitySurface": "#FFFFFF",
+      "shadow": "#1B311E"
+    },
+    "dark": {
+      "background": "#091F15",
+      "surface": "#163427",
+      "surfaceElevated": "#1C3C2B",
+      "surfaceMuted": "#233B29",
+      "scrim": "rgba(0, 10, 5, 0.68)",
+      "primaryText": "#F7F5EB",
+      "secondaryText": "#D0D8CB",
+      "mutedText": "#BDCCBC",
+      "inverseText": "#102312",
+      "disabledText": "#8C9E8D",
+      "brand": "#E4F486",
+      "onBrand": "#102A1C",
+      "accent": "#DCEC7C",
+      "onAccent": "#102312",
+      "highlight": "#CDE65F",
+      "onHighlight": "#102A1C",
+      "selectedSurface": "#254A31",
+      "selectedText": "#DCEC7C",
+      "line": "#2D4938",
+      "lineSubtle": "#233D2C",
+      "lineFocused": "#DCEC7C",
+      "success": "#B9D99D",
+      "successSurface": "#254A31",
+      "warning": "#EBCB85",
+      "warningSurface": "#3F3520",
+      "error": "#FFB3AC",
+      "errorSurface": "#50352E",
+      "information": "#B6D5CB",
+      "informationSurface": "#203C34",
+      "avatar": "#C4DCAE",
+      "onAvatar": "#204C37",
+      "decoration": "#23351B",
+      "sheetSurface": "#163427",
+      "sheetLine": "#43553F",
+      "iconSurface": "#3C5431",
+      "favorite": "#EDB84E",
+      "mediaBackground": "#101512",
+      "mediaForeground": "#FFFFFF",
+      "identitySurface": "#FFFFFF",
+      "shadow": "#000A05"
+    }
+  },
+  "typography": {
+    "display": {
+      "fontSize": 43,
+      "lineHeight": 53,
+      "fontWeight": "400",
+      "letterSpacing": -0.8
+    },
+    "hero": {
+      "fontSize": 43,
+      "lineHeight": 50,
+      "fontWeight": "400",
+      "letterSpacing": -1.1
+    },
+    "heading": {
+      "fontSize": 34,
+      "lineHeight": 41,
+      "fontWeight": "400",
+      "letterSpacing": -0.8
+    },
+    "editorHeading": {
+      "fontSize": 32,
+      "lineHeight": 40,
+      "fontWeight": "400",
+      "letterSpacing": -0.4
+    },
+    "sheetHeading": {
+      "fontSize": 36,
+      "lineHeight": 44,
+      "fontWeight": "400",
+      "letterSpacing": -0.8
+    },
+    "section": {
+      "fontSize": 20,
+      "lineHeight": 28,
+      "fontWeight": "600"
+    },
+    "cardTitle": {
+      "fontSize": 16,
+      "lineHeight": 21,
+      "fontWeight": "700",
+      "letterSpacing": -0.3
+    },
+    "body": {
+      "fontSize": 16,
+      "lineHeight": 24,
+      "fontWeight": "400"
+    },
+    "secondary": {
+      "fontSize": 15,
+      "lineHeight": 22,
+      "fontWeight": "400"
+    },
+    "caption": {
+      "fontSize": 13,
+      "lineHeight": 19,
+      "fontWeight": "400"
+    },
+    "eyebrow": {
+      "fontSize": 11,
+      "lineHeight": 16,
+      "fontWeight": "600",
+      "letterSpacing": 1.2
+    },
+    "button": {
+      "fontSize": 17,
+      "lineHeight": 24,
+      "fontWeight": "600"
+    },
+    "heroButton": {
+      "fontSize": 19,
+      "lineHeight": 26,
+      "fontWeight": "600",
+      "letterSpacing": -0.4
+    },
+    "label": {
+      "fontSize": 15,
+      "lineHeight": 22,
+      "fontWeight": "600"
+    },
+    "chip": {
+      "fontSize": 14,
+      "lineHeight": 20,
+      "fontWeight": "600"
+    },
+    "nav": {
+      "fontSize": 12,
+      "lineHeight": 17,
+      "fontWeight": "400"
+    },
+    "wordmark": {
+      "fontSize": 24,
+      "lineHeight": 32,
+      "fontWeight": "700",
+      "letterSpacing": -0.8
+    },
+    "avatar": {
+      "fontSize": 21,
+      "lineHeight": 28,
+      "fontWeight": "700"
+    },
+    "actionTitle": {
+      "fontSize": 19,
+      "lineHeight": 26,
+      "fontWeight": "600",
+      "letterSpacing": -0.4
+    },
+    "intro": {
+      "fontSize": 18,
+      "lineHeight": 26,
+      "fontWeight": "400"
+    },
+    "welcomeCopy": {
+      "fontSize": 17,
+      "lineHeight": 23,
+      "fontWeight": "400",
+      "letterSpacing": -0.35
+    },
+    "nativeHeading": {
+      "fontSize": 21,
+      "lineHeight": 28,
+      "fontWeight": "400"
+    }
+  },
+  "spacing": {
+    "none": 0,
+    "tiny": 4,
+    "small": 8,
+    "compact": 12,
+    "medium": 16,
+    "regular": 20,
+    "large": 24,
+    "wide": 28,
+    "sectionSmall": 32,
+    "section": 40,
+    "sectionLarge": 48,
+    "hero": 56,
+    "loose": 36,
+    "sectionWide": 44
+  },
+  "radii": {
+    "tiny": 4,
+    "small": 8,
+    "tile": 14,
+    "medium": 16,
+    "button": 18,
+    "large": 24,
+    "sheet": 34,
+    "full": 999
+  },
+  "geometry": {
+    "contentWidth": 520,
+    "editorWidth": 480,
+    "welcomeWidth": 390,
+    "emptyWidth": 440,
+    "sheetWidth": 540,
+    "screenPadding": 24,
+    "touch": 48,
+    "buttonHeight": 56,
+    "heroButtonHeight": 60,
+    "rowSpacing": 12,
+    "thumbnail": 60,
+    "icon": 24,
+    "iconLarge": 32,
+    "iconHero": 56,
+    "strokeWidth": 2,
+    "divider": 1,
+    "fab": 58,
+    "navHeight": 70,
+    "sheetHandleWidth": 48,
+    "sheetHandleHeight": 4,
+    "sheetActionHeight": 88,
+    "listBottomClearance": 100
+  },
+  "elevation": {
+    "floating": {
+      "shadowOpacity": 0.21,
+      "shadowRadius": 16,
+      "shadowOffset": {
+        "width": 0,
+        "height": 6
+      },
+      "elevation": 6
+    },
+    "sheet": {
+      "shadowOpacity": 0.18,
+      "shadowRadius": 24,
+      "shadowOffset": {
+        "width": 0,
+        "height": -4
+      },
+      "elevation": 12
+    }
+  }
+}

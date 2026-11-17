@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import {tokens} from '../../src/theme';
+import {useState} from 'react';
 import {Alert, View} from 'react-native';
 import {router} from 'expo-router';
 import {useShareInbox} from '../../src/share-inbox';
@@ -22,7 +23,7 @@ export default function ShareInbox() {
     {!!inbox.error && <Notice kind="error">{inbox.error}</Notice>}
     {!inbox.supported && <Notice>This installed build needs a native update to support the share inbox.</Notice>}
     {inbox.supported && !inbox.items.length && !inbox.error && <Type>No shares are waiting for this account.</Type>}
-    {inbox.items.map(item => <View key={item.key} style={{gap:8,paddingVertical:12}}>
+    {inbox.items.map(item => <View key={item.key} style={{gap: tokens.space.small,paddingVertical: tokens.space.compact}}>
       <Type variant="label">{item.title}</Type>
       <Type muted variant="caption">{item.kind} · Saved on this device · {item.blocked ? 'Needs attention' : 'Waiting to sync'}</Type>
       {!!item.error && <Notice>{item.error}</Notice>}

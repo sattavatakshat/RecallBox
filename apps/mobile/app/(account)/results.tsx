@@ -1,11 +1,12 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, View} from 'react-native';
+import {LoadingIndicator, Button, FilterChip, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
+import {tokens} from '../../src/theme';
+import {useEffect, useRef, useState} from 'react';
+import {View} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {MemorySummary, memoriesApi} from '../../src/api';
 import {useMemories} from '../../src/memories';
 import {useSession} from '../../src/session';
 import {MemoryCard} from '../../src/memory-card';
-import {Button, FilterChip, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
 
 type Kind = 'all' | 'link' | 'note' | 'image' | 'pdf';
 const usable = (item: MemorySummary) =>
@@ -84,24 +85,24 @@ export default function Results() {
     Date.parse(b.created_at)-Date.parse(a.created_at)) : filtered;
 
   return <Screen compact>
-    <TextAction label="← Edit search" onPress={() => router.replace({
+    <TextAction icon="back" label="Edit search" onPress={() => router.replace({
       pathname:'/(account)/search',params:{q}})}/>
     <Type variant="eyebrow" muted>SEARCH RESULTS</Type>
     <Type title>{q ? '“'+q+'”' : 'Your saved things'}</Type>
     <Type muted>{busy ? 'Looking through your Library…'
       : `${shown.length} ${shown.length === 1 ? 'result' : 'results'} from accessible saved content`}</Type>
-    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
       {([['all','All'],['link','Links'],['note','Notes'],['image','Photos'],['pdf','PDFs']] as const)
         .map(([value,label]) => <FilterChip key={value} label={label}
           selected={kind===value} onPress={() => setKind(value)}/>)}
     </View>
-    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+    <View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
       <FilterChip label="Starred" selected={starred} onPress={() => setStarred(v => !v)}/>
       <FilterChip label="Most recent" selected={recent} onPress={() => setRecent(v => !v)}/>
     </View>
-    {busy && <ActivityIndicator color={p.accent} accessibilityLabel="Searching your memories"/>}
+    {busy && <LoadingIndicator color={p.accent} accessibilityLabel="Searching your memories"/>}
     {!!error && <Notice kind="error">{error}</Notice>}
-    {!busy && searched && !error && shown.length===0 && <View style={{gap:12,marginTop:8}}>
+    {!busy && searched && !error && shown.length===0 && <View style={{gap: tokens.space.compact,marginTop: tokens.space.small}}>
       <Type variant="section">Nothing found here.</Type>
       <Type muted>Try another phrase, a different type, or remove Starred. RecallBox never makes up missing source text.</Type>
       <Button variant="secondary" label="Edit search" onPress={() => router.replace({

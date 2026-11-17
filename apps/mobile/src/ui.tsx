@@ -1,212 +1,181 @@
-import React from 'react';
-import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
-  Text, TextInput, View, useColorScheme,
-} from 'react-native';
-import type {TextInputProps, TextStyle, StyleProp, ViewStyle} from 'react-native';
+import React, {useState} from 'react';
+import {ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, Animated, type TextInputProps, type TextProps, type StyleProp, type ViewStyle, type TextStyle} from 'react-native';
+
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {tokens, usePalette, useTypeStyle, type Typography} from './theme';
+import {Icon, type IconName} from './icons';
+export {tokens, palettes, usePalette} from './theme';
+export {Icon} from './icons';
 
-/**
- * RecallBox field-notebook design system.
- * UX-001: visual foundations only; existing feature screens keep working.
- * Contrast and touch sizes are intentional for light/dark phones.
- */
-export const tokens = {
-  space: {tiny: 4, small: 8, compact: 12, medium: 16, large: 24, section: 40},
-  radius: 16,
-  radii: {small: 10, medium: 16, large: 20, full: 999},
-  width: 520,
-  touch: 48,
-  type: {
-    eyebrow: {fontSize: 11, lineHeight: 16, letterSpacing: 1.2} as TextStyle,
-    caption: {fontSize: 13, lineHeight: 19} as TextStyle,
-    body: {fontSize: 16, lineHeight: 24} as TextStyle,
-    label: {fontSize: 15, lineHeight: 21, fontWeight: '600'} as TextStyle,
-    section: {fontSize: 20, lineHeight: 28, fontWeight: '600'} as TextStyle,
-    title: {fontSize: 34, lineHeight: 41} as TextStyle,
-  },
-} as const;
-
-export const palettes = {
-  light: {
-    paper: '#F6F4EC', surface: '#FFFFFF', surfaceMuted: '#EEEFE8',
-    ink: '#25392D', muted: '#526359', faint: '#66786D',
-    accent: '#284D3B', onAccent: '#FFFFFF', line: '#DEE3DA',
-    success: '#246A4A', danger: '#A43439', onDanger: '#FFFFFF',
-  },
-  dark: {
-    paper: '#171E1A', surface: '#222D26', surfaceMuted: '#2A382E',
-    ink: '#F2F0E7', muted: '#BCC9BE', faint: '#A4B8A9',
-    accent: '#CFE0BA', onAccent: '#17231B', line: '#3B4A40',
-    success: '#AEDABD', danger: '#FF9A9C', onDanger: '#26191B',
-  },
-} as const;
-
-export function usePalette() {
-  return useColorScheme() === 'dark' ? palettes.dark : palettes.light;
+export function Type({children, title = false, muted = false, variant, style, ...props}: TextProps & {
+  title?: boolean; muted?: boolean; variant?: Typography;
+}) {
+  const p = usePalette();
+  const role = variant ?? (title ? 'title' : 'body');
+  const typography = useTypeStyle(role);
+  return <Text {...props} accessibilityRole={props.accessibilityRole ??
+    (['display', 'hero', 'title', 'heading', 'section', 'editorHeading', 'sheetHeading'].includes(role) ? 'header' : undefined)}
+    style={[typography, {color: muted ? p.secondaryText : p.primaryText}, style]}>{children}</Text>;
 }
 
-type Typography = 'body' | 'caption' | 'eyebrow' | 'label' | 'section' | 'title';
-export function Type({children, title = false, muted = false, variant,
-  style, numberOfLines}: React.PropsWithChildren<{
-    title?: boolean; muted?: boolean; variant?: Typography;
-    style?: StyleProp<TextStyle>; numberOfLines?: number;
-  }>) {
+export function Screen({children, compact = false, contentWidth = tokens.width}: React.PropsWithChildren<{compact?: boolean; contentWidth?: number}>) {
   const p = usePalette();
-  const kind = variant ?? (title ? 'title' : 'body');
-  const longTitle = kind === 'title' && typeof children === 'string' && children.length > 40;
-  return <Text numberOfLines={numberOfLines}
-    style={[
-      {color: muted ? p.muted : p.ink},
-      tokens.type[kind],
-      kind === 'title' && {
-        fontFamily: Platform.select({ios: 'Georgia', android: 'serif'}),
-        fontSize: longTitle ? 30 : tokens.type.title.fontSize,
-        lineHeight: longTitle ? 37 : tokens.type.title.lineHeight,
-      },
-      style,
-    ]}>{children}</Text>;
-}
-
-export function Screen({children, compact = false}: React.PropsWithChildren<{compact?: boolean}>) {
-  const p = usePalette();
-  return <SafeAreaView style={{flex: 1, backgroundColor: p.paper}}>
+  return <SafeAreaView style={{flex: 1, backgroundColor: p.background}}>
     <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          flexGrow: 1, padding: compact ? tokens.space.medium : tokens.space.large,
-          gap: compact ? tokens.space.medium : tokens.space.large,
-          maxWidth: tokens.width, width: '100%', alignSelf: 'center',
-        }}>{children}</ScrollView>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{flexGrow: 1,
+        padding: compact ? tokens.space.medium : tokens.geometry.screenPadding,
+        gap: compact ? tokens.space.medium : tokens.space.large,
+        maxWidth: contentWidth, width: '100%', alignSelf: 'center'}}>{children}</ScrollView>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 
+export function LoadingIndicator({label = 'Loading', color, ...props}: React.ComponentProps<typeof ActivityIndicator> & {label?: string}) {
+  const p = usePalette();
+  return <ActivityIndicator {...props} accessibilityLabel={props.accessibilityLabel ?? label} accessibilityRole="progressbar" color={color ?? p.brand}/>;
+}
 type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
-export function Button({label, onPress, busy = false, disabled = false, variant = 'primary'}: {
-  label: string; onPress: () => void; busy?: boolean; disabled?: boolean;
-  variant?: ButtonVariant;
+export function Button({label, onPress, busy = false, disabled = false, variant = 'primary',
+  leading, size = 'default', style, labelStyle, accessibilityLabel}: {
+  label: string; onPress: () => void; busy?: boolean; disabled?: boolean; variant?: ButtonVariant;
+  leading?: React.ReactNode; size?: 'default' | 'hero' | 'compact'; style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>; accessibilityLabel?: string;
 }) {
   const p = usePalette();
-  const isPrimary = variant === 'primary';
-  const isDanger = variant === 'danger';
-  const foreground = isPrimary ? p.onAccent : isDanger ? p.danger : p.ink;
-  return <Pressable accessibilityRole="button" accessibilityLabel={label}
-    accessibilityState={{disabled: disabled || busy, busy}} disabled={disabled || busy}
-    onPress={onPress}
-    style={({pressed}) => ({
-      minHeight: 52, borderRadius: tokens.radii.medium,
-      paddingHorizontal: tokens.space.large, paddingVertical: tokens.space.compact,
-      alignItems: 'center', justifyContent: 'center',
-      backgroundColor: isPrimary ? p.accent : variant === 'quiet' ? 'transparent' : p.surface,
-      borderWidth: isPrimary || variant === 'quiet' ? 0 : 1,
-      borderColor: isDanger ? p.danger : p.line,
-      opacity: pressed ? 0.76 : disabled ? 0.5 : 1,
-    })}>
-    {busy ? <ActivityIndicator accessibilityLabel="Please wait" color={foreground}/> :
-      <Text style={{color: foreground, fontSize: 16, lineHeight: 22, fontWeight: '600', textAlign: 'center'}}>{label}</Text>}
+  const primary = variant === 'primary', quiet = variant === 'quiet';
+  const foreground = primary ? p.onButton : variant === 'danger' ? p.error : p.primaryText;
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label}
+    accessibilityState={{disabled: disabled || busy, busy}} disabled={disabled || busy} onPress={onPress}
+    style={({pressed}) => [{minHeight: size === 'hero' ? tokens.geometry.heroButtonHeight :
+      size === 'compact' || quiet ? tokens.touch : tokens.geometry.buttonHeight,
+      borderRadius: tokens.radii.button, paddingHorizontal: tokens.space.large,
+      paddingVertical: tokens.space.compact, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: primary ? p.button : quiet ? 'transparent' : p.surface,
+      borderWidth: primary || quiet ? 0 : tokens.geometry.divider,
+      borderColor: variant === 'danger' ? p.error : p.line,
+      opacity: disabled ? 0.5 : pressed ? 0.76 : 1}, style]}>
+    {busy ? <LoadingIndicator label="Please wait" color={foreground}/> :
+      <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: tokens.space.compact}}>
+        {leading}<Type variant={size === 'hero' ? 'heroButton' : 'button'} style={[{color: foreground, textAlign: 'center', flexShrink: 1}, labelStyle]}>{label}</Type>
+      </View>}
   </Pressable>;
 }
 
-export function Input({label, style, ...props}: TextInputProps & {label: string}) {
+export function Input({label, style, onFocus, onBlur, ...props}: TextInputProps & {label: string}) {
   const p = usePalette();
+  const typography = useTypeStyle('body');
+  const [focused, setFocused] = useState(false);
   return <View style={{gap: tokens.space.small}}>
     <Type variant="label">{label}</Type>
-    <TextInput {...props} accessibilityLabel={label}
-      placeholderTextColor={props.placeholderTextColor ?? p.faint}
-      selectionColor={p.accent}
-      style={[{
-        minHeight: 52, paddingHorizontal: tokens.space.medium,
-        paddingVertical: tokens.space.compact, backgroundColor: p.surface,
-        borderWidth: 1, borderColor: p.line, borderRadius: tokens.radii.medium,
-        color: p.ink, fontSize: 16, lineHeight: 24,
-      }, style]}/>
+    <TextInput {...props} accessibilityLabel={label} placeholderTextColor={props.placeholderTextColor ?? p.mutedText}
+      selectionColor={p.brand} onFocus={event => {setFocused(true); onFocus?.(event);}}
+      onBlur={event => {setFocused(false); onBlur?.(event);}}
+      style={[typography, {minHeight: tokens.geometry.buttonHeight, paddingHorizontal: tokens.space.medium,
+        paddingVertical: tokens.space.compact, backgroundColor: p.surface, borderWidth: tokens.geometry.divider,
+        borderColor: focused ? p.lineFocused : p.line, borderRadius: tokens.radii.medium, color: p.primaryText}, style]}/>
   </View>;
 }
 
-export function Notice({children, kind = 'info'}: React.PropsWithChildren<{
-  kind?: 'info' | 'error' | 'success';
-}>) {
+export function Notice({children, kind = 'info'}: React.PropsWithChildren<{kind?: 'info' | 'error' | 'success' | 'warning'}>) {
   const p = usePalette();
-  return <View accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'}
-    accessibilityRole={kind === 'error' ? 'alert' : undefined}>
-    <Type variant="caption" style={{color: kind === 'error' ? p.danger : kind === 'success' ? p.success : p.muted}}>
-      {children}
-    </Type>
+  return <View accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'} accessibilityRole={kind === 'error' ? 'alert' : undefined}>
+    <Type variant="caption" style={{color: kind === 'error' ? p.error : kind === 'success' ? p.success : kind === 'warning' ? p.warning : p.secondaryText}}>{children}</Type>
   </View>;
 }
-
-export function TextAction({label, onPress, disabled = false}: {
-  label: string; onPress: () => void; disabled?: boolean;
+export function TextAction({label, onPress, disabled = false, icon}: {
+  label: string; onPress: () => void; disabled?: boolean; icon?: IconName;
 }) {
   const p = usePalette();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label}
-    accessibilityState={{disabled}} disabled={disabled} onPress={onPress}
-    style={({pressed}) => ({
-      minHeight: tokens.touch, paddingVertical: tokens.space.compact,
-      paddingHorizontal: tokens.space.small, alignSelf: 'flex-start',
-      justifyContent: 'center', opacity: disabled ? 0.5 : pressed ? 0.7 : 1,
-    })}>
-    <Text style={{color: p.accent, fontSize: 15, fontWeight: '600', lineHeight: 21}}>{label}</Text>
+  // Legacy callers keep their contracts while navigation arrows become real icons.
+  const back = label.startsWith('← '), forward = label.startsWith('→ ');
+  const clean = back || forward ? label.slice(2) : label;
+  return <Pressable accessibilityRole="button" accessibilityLabel={clean} accessibilityState={{disabled}}
+    disabled={disabled} onPress={onPress} style={({pressed}) => ({minHeight: tokens.touch,
+      paddingVertical: tokens.space.compact, paddingHorizontal: tokens.space.small,
+      flexDirection: 'row', alignItems: 'center', gap: tokens.space.small, alignSelf: 'flex-start',
+      opacity: disabled ? 0.5 : pressed ? 0.7 : 1})}>
+    {(icon || back || forward) && <Icon name={icon ?? (back ? 'back' : 'chevron')} color={p.brand}/>}
+    <Type variant="label" style={{color: p.brand, flexShrink: 1}}>{clean}</Type>
   </Pressable>;
 }
-
-/** Neutral surface reused for memory rows, collection previews and contextual panels. */
+export function BackButton({label = 'Back', onPress}: {label?: string; onPress: () => void}) {
+  return <TextAction label={label} onPress={onPress} icon="back"/>;
+}
 export function Card({children, style}: React.PropsWithChildren<{style?: StyleProp<ViewStyle>}>) {
   const p = usePalette();
-  return <View style={[{
-    backgroundColor: p.surface, borderRadius: tokens.radii.large,
-    borderWidth: 1, borderColor: p.line, padding: tokens.space.medium,
-  }, style]}>{children}</View>;
+  return <View style={[{backgroundColor: p.surface, borderRadius: tokens.radii.large,
+    borderWidth: tokens.geometry.divider, borderColor: p.line, padding: tokens.space.medium}, style]}>{children}</View>;
 }
-
-/** Optional filter. The consuming screen owns filter state. */
 export function FilterChip({label, selected, onPress, disabled = false}: {
   label: string; selected: boolean; onPress: () => void; disabled?: boolean;
 }) {
   const p = usePalette();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label}
-    accessibilityState={{selected, disabled}} disabled={disabled} onPress={onPress}
-    style={({pressed}) => ({
-      minHeight: tokens.touch, borderRadius: tokens.radii.full,
-      paddingHorizontal: tokens.space.medium, paddingVertical: tokens.space.compact,
-      alignItems: 'center', justifyContent: 'center',
-      backgroundColor: selected ? p.accent : p.surfaceMuted,
-      opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
-    })}>
-    <Text style={{fontSize: 14, fontWeight: '600', color: selected ? p.onAccent : p.ink}}>{label}</Text>
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected, disabled}}
+    disabled={disabled} onPress={onPress} style={({pressed}) => ({minHeight: tokens.touch,
+      borderRadius: tokens.radii.full, paddingHorizontal: tokens.space.medium, paddingVertical: tokens.space.small,
+      borderWidth: tokens.geometry.divider, borderColor: selected ? p.button : p.line,
+      alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? p.button : 'transparent',
+      opacity: disabled ? 0.5 : pressed ? 0.75 : 1})}>
+    <Type variant="chip" style={{color: selected ? p.onButton : p.primaryText}}>{label}</Type>
   </Pressable>;
 }
-
-/** Explicit accessible tap target; the child is a real icon or short text label. */
-export function IconButton({label, children, onPress, disabled = false}: React.PropsWithChildren<{
-  label: string; onPress: () => void; disabled?: boolean;
+export function IconButton({label, children, onPress, disabled = false, selected, icon, color, filled}: React.PropsWithChildren<{
+  label: string; onPress: () => void; disabled?: boolean; selected?: boolean; icon?: IconName; color?: string; filled?: boolean;
 }>) {
   const p = usePalette();
-  return <Pressable accessibilityRole="button" accessibilityLabel={label}
-    accessibilityState={{disabled}} disabled={disabled} onPress={onPress}
-    style={({pressed}) => ({
-      minWidth: tokens.touch, minHeight: tokens.touch, borderRadius: tokens.radii.full,
-      alignItems: 'center', justifyContent: 'center',
-      backgroundColor: pressed ? p.surfaceMuted : 'transparent',
-      opacity: disabled ? 0.5 : 1,
-    })}>{children}</Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled, selected}}
+    disabled={disabled} onPress={onPress} style={({pressed}) => ({minWidth: tokens.touch, minHeight: tokens.touch,
+      borderRadius: tokens.radii.full, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: pressed ? p.surfaceMuted : 'transparent', opacity: disabled ? 0.5 : 1})}>
+    {icon ? <Icon name={icon} color={color} filled={filled}/> : children}
+  </Pressable>;
 }
-
-export function Divider() {
+export function Divider({inset = 0}: {inset?: number}) {
   const p = usePalette();
   return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-    style={{height: 1, backgroundColor: p.line}}/>;
+    style={{height: tokens.geometry.divider, marginLeft: inset, backgroundColor: p.line}}/>;
 }
-
-
-/** A truthful error/empty state, with no fake saved data or endless spinner. */
-export function RecoveryState({title,description,onRetry,retryLabel='Try again'}: {
+export function RecoveryState({title, description, onRetry, retryLabel = 'Try again'}: {
   title: string; description: string; onRetry?: () => void; retryLabel?: string;
 }) {
-  return <View style={{paddingVertical: tokens.space.section,gap:tokens.space.medium}}>
-    <Type variant="section">{title}</Type>
-    <Type muted>{description}</Type>
+  return <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
+    <Type variant="section">{title}</Type><Type muted>{description}</Type>
     {!!onRetry && <Button label={retryLabel} variant="secondary" onPress={onRetry}/>}
   </View>;
+}
+export const EmptyState = RecoveryState;
+export function SectionHeader({title, action}: {title: string; action?: React.ReactNode}) {
+  return <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: tokens.space.small}}>
+    <Type variant="section" style={{flex: 1}}>{title}</Type>{action}
+  </View>;
+}
+export function SourcePlaceholder({kind, size = tokens.geometry.thumbnail}: {kind: string; size?: number}) {
+  const p = usePalette();
+  const name = kind === 'url' || kind === 'link' ? 'link' : kind === 'pdf' ? 'pdf' : kind === 'image' ? 'image' : 'note';
+  return <View style={{width: size, height: size, borderRadius: tokens.radii.tile, backgroundColor: p.avatar,
+    alignItems: 'center', justifyContent: 'center'}}><Icon name={name} color={p.onAvatar} size={tokens.geometry.iconLarge}/></View>;
+}
+/** Surface only: the caller retains Modal, route, gesture and dismissal ownership. */
+export function SheetSurface({children, style, animated = false, ...props}: React.ComponentProps<typeof Animated.View> & {animated?: boolean}) {
+  const p = usePalette();
+  const Surface = Animated.View;
+  return <Surface {...props} accessibilityViewIsModal style={[{width: '100%', maxWidth: tokens.geometry.sheetWidth,
+    alignSelf: 'center', borderTopLeftRadius: tokens.radii.sheet, borderTopRightRadius: tokens.radii.sheet,
+    borderWidth: tokens.geometry.divider, borderColor: p.sheetLine, backgroundColor: p.sheetSurface,
+    overflow: 'hidden', shadowColor: p.shadow, ...tokens.elevation.sheet}, style]}>{children}</Surface>;
+}
+export function ActionRow({title, subtitle, icon, onPress}: {title: string; subtitle?: string; icon: IconName; onPress: () => void}) {
+  const p = usePalette();
+  return <Pressable accessibilityRole="button" accessibilityLabel={[title, subtitle].filter(Boolean).join('. ')}
+    onPress={onPress} style={({pressed}) => ({minHeight: tokens.geometry.sheetActionHeight, flexDirection: 'row',
+      alignItems: 'center', gap: tokens.space.medium, paddingVertical: tokens.space.compact,
+      borderBottomWidth: tokens.geometry.divider, borderBottomColor: p.line, opacity: pressed ? 0.65 : 1})}>
+    <View style={{width: tokens.geometry.fab, height: tokens.geometry.fab, borderRadius: tokens.radii.button,
+      backgroundColor: p.iconSurface, alignItems: 'center', justifyContent: 'center'}}>
+      <Icon name={icon} color={p.brand} size={tokens.geometry.iconLarge}/>
+    </View>
+    <View style={{flex: 1, gap: tokens.space.tiny}}><Type variant="actionTitle">{title}</Type>
+      {!!subtitle && <Type variant="secondary" muted>{subtitle}</Type>}</View>
+    <Icon name="chevron" color={p.brand}/>
+  </Pressable>;
 }

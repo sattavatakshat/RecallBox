@@ -44,6 +44,8 @@ jobs:
           cache-dependency-path: apps/mobile/package-lock.json
       - name: Install exact locked development dependencies
         run: npm ci --no-audit --no-fund
+      - name: Check centralized design-system conventions
+        run: npm run design:check
       - name: Type-check React Native / Expo
         run: npm run typecheck
 

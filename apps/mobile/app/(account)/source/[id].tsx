@@ -1,4 +1,6 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import {tokens} from '../../../src/theme';
+import {Icon, sourceIcon} from '../../../src/icons';
+import {useCallback, useEffect, useState} from 'react';
 import {Image, Linking, View} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
 import {Memory} from '../../../src/api';
@@ -44,8 +46,6 @@ export default function SourceCoverage() {
       ?'Only the original file/link and available metadata were saved. The full contents were not extracted.'
     :record?.processing_state==='failed'?'Source details could not be extracted.'
     :'This source has not completed processing.';
-  const glyph=record?.kind==='image'?'▧':record?.kind==='pdf'?'▤':
-    record?.kind==='note'?'≡':'↗';
   const text=record?.kind==='note'?record.content:record?.extracted_text??'';
 
   async function openLink(){
@@ -54,39 +54,39 @@ export default function SourceCoverage() {
     catch{setError('Unable to open the original on this device.');}
   }
   return <Screen compact>
-    <TextAction label="← Memory" onPress={()=>router.back()}/>
+    <TextAction icon="back" label="Memory" onPress={()=>router.back()}/>
     <Type title>Real content, not guesses.</Type>
     <Type muted>Different sources provide different levels of evidence. RecallBox never fills gaps with invented details.</Type>
     {!!error&&<Notice kind="error">{error}</Notice>}
     {loading&&<Notice>Loading saved source details…</Notice>}
     {!record&&!loading&&<Button label="Try again" onPress={()=>void load()}/>}
     {record&&<>
-      <View style={{height:148,borderRadius:22,backgroundColor:p.surfaceMuted,
+      <View style={{height:148,borderRadius: tokens.radii.large,backgroundColor:p.surfaceMuted,
         justifyContent:'center',alignItems:'center'}}>
-        <Type style={{fontSize:55,color:p.accent}}>{glyph}</Type>
+        <Icon name={sourceIcon(record?.kind ?? 'note')} size={tokens.geometry.iconHero} color={p.brand}/>
       </View>
       <Type variant="section" numberOfLines={3}>{record.title||'Saved source'}</Type>
       {record.kind==='image'&&imageSource&&!imageError&&
         <Image source={imageSource} resizeMode="contain"
-          style={{width:'100%',height:280,borderRadius:16}}
+          style={{width:'100%',height:280,borderRadius: tokens.radii.medium}}
           onError={()=>setImageError(true)}/>}
       {imageError&&<Notice kind="error">The private image preview is unavailable. The saved file may still be accessible from Memory Detail.</Notice>}
       <Type variant="eyebrow" muted>COVERAGE</Type>
-      <View style={{backgroundColor:p.surfaceMuted,padding:17,borderRadius:16,gap:8}}>
+      <View style={{backgroundColor:p.surfaceMuted,padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.small}}>
         <Type variant="label">{record.processing_state==='ready'?'Available text':
           record.processing_state==='metadata_only'?'Link or preview only':
           record.processing_state==='failed'?'Processing failed':'Source saved'}</Type>
         <Type muted>{coverage}</Type>
         {!!record.processing_error&&<Type muted variant="caption">{record.processing_error}</Type>}
       </View>
-      {!!text.trim()&&<View style={{gap:10}}>
+      {!!text.trim()&&<View style={{gap: tokens.space.small}}>
         <Type variant="section">Text we actually have</Type>
-        <Type style={{lineHeight:26}}>{text.slice(0,6000)}</Type>
+        <Type>{text.slice(0,6000)}</Type>
         {text.length>6000&&<Notice>This view shows an excerpt of available source text.</Notice>}
       </View>}
       <Type variant="eyebrow" muted>SOURCE DETAILS</Type>
-      <View style={{backgroundColor:p.surface,padding:17,borderRadius:16,borderWidth:1,
-        borderColor:p.line,gap:8}}>
+      <View style={{backgroundColor:p.surface,padding: tokens.space.medium,borderRadius: tokens.radii.medium,borderWidth:1,
+        borderColor:p.line,gap: tokens.space.small}}>
         <Type muted variant="caption">Type: {record.kind.toUpperCase()}</Type>
         <Type muted variant="caption">Saved: {new Date(record.created_at).toLocaleDateString()}</Type>
         {!!record.source_url&&<Type muted variant="caption" numberOfLines={3}>{record.source_url}</Type>}

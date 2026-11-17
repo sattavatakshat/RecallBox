@@ -1,9 +1,11 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ApiError, CollectionDetail, collectionsApi, tripApi } from '../../../src/api';
-import { useSession } from '../../../src/session';
-import { Button, Input, Notice, Screen, TextAction, Type, usePalette } from '../../../src/ui';
+import {LoadingIndicator, Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../../src/ui';
+import {tokens} from '../../../src/theme';
+import {Icon, sourceIcon} from '../../../src/icons';
+import {useCallback, useRef, useState} from 'react';
+import {Alert, Pressable, View} from 'react-native';
+import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
+import {ApiError, CollectionDetail, collectionsApi, tripApi} from '../../../src/api';
+import {useSession} from '../../../src/session';
 
 export default function CollectionScreen() {
   const {id} = useLocalSearchParams<{id: string}>();
@@ -106,7 +108,7 @@ export default function CollectionScreen() {
       })}/>}
     {!!error && <Notice>{error}</Notice>}
     {!!notice && <Notice>{notice}</Notice>}
-    {loading && <ActivityIndicator accessibilityLabel="Opening collection" color={p.ink}/>}
+    {loading && <LoadingIndicator accessibilityLabel="Opening collection" color={p.ink}/>}
     {data && <>
       {renaming ? <>
         <Input label="Collection name" value={draftName} onChangeText={setDraftName}
@@ -118,18 +120,17 @@ export default function CollectionScreen() {
       <Type variant="section">{data.items.length} saved {data.items.length === 1 ? 'item' : 'items'}</Type>
       {data.items.length === 0 && <Notice>Nothing here yet. Open a saved note or link, then choose Add to collection.</Notice>}
       {data.items.map(item => <View key={item.id} style={{borderBottomWidth: 1,
-        borderColor: p.line, paddingVertical: 16, gap: 8}}>
+        borderColor: p.line, paddingVertical: tokens.space.medium, gap: tokens.space.small}}>
         <Pressable accessibilityRole="button"
           accessibilityLabel={`Open ${item.title || 'memory'}`}
           onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
-          style={({pressed}) => ({minHeight:64,flexDirection:'row',alignItems:'center',gap:12,
+          style={({pressed}) => ({minHeight:64,flexDirection:'row',alignItems:'center',gap: tokens.space.compact,
             opacity:pressed ? 0.7 : 1})}>
-          <View style={{height:52,width:52,borderRadius:12,backgroundColor:p.surfaceMuted,
+          <View style={{height:52,width:52,borderRadius: tokens.radii.tile,backgroundColor:p.surfaceMuted,
             alignItems:'center',justifyContent:'center'}}>
-            <Type>{item.kind === 'note' ? '≡' : item.kind === 'pdf' ? '▤' :
-              item.kind === 'image' ? '▧' : '↗'}</Type>
+            <Icon name={sourceIcon(item.kind)} color={p.brand}/>
           </View>
-          <View style={{flex:1,gap:5}}>
+          <View style={{flex:1,gap: tokens.space.tiny}}>
             <Type variant="label" numberOfLines={2}>{item.title ||
               (item.kind === 'link' ? 'Saved link' : 'Untitled note')}</Type>
             {!!item.preview && <Type muted variant="caption" numberOfLines={2}>{item.preview}</Type>}
@@ -139,7 +140,7 @@ export default function CollectionScreen() {
           onPress={() => removeItem(item.id, item.title || 'This memory')}/>
       </View>)}
       {data.items.filter(item => /travel|trip|places/i.test([item.topic_override,item.suggested_topic,item.title].filter(Boolean).join(' '))).slice(0,1).map(item =>
-        <View key={'trip-'+item.id} style={{gap:8,marginTop:12}}>
+        <View key={'trip-'+item.id} style={{gap: tokens.space.small,marginTop: tokens.space.compact}}>
           <Type muted variant="caption">From a saved travel source</Type>
           <Button label="Start a trip shortlist" busy={tripBusy} disabled={busy}
             onPress={() => void startTrip(item.id)}/>

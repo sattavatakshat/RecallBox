@@ -1,7 +1,7 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, FlatList, Pressable, ScrollView, Text, View, useColorScheme} from 'react-native';
+import {LoadingIndicator, Type, Icon, FilterChip, Divider, SectionHeader, EmptyState, Notice, tokens} from '../../src/ui';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {Alert, FlatList, Pressable, ScrollView, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {StatusBar} from 'expo-status-bar';
 import {router, useFocusEffect} from 'expo-router';
 import {MemorySummary} from '../../src/api';
 import {errorMessage, useMemories} from '../../src/memories';
@@ -10,7 +10,9 @@ import {isUsableMemory, isUnfinishedMemory, libraryMode} from '../../src/library
 import {MemoryCard} from '../../src/memory-card';
 import {useShareInbox} from '../../src/share-inbox';
 import {useSession} from '../../src/session';
-import {BrandLockup, useBrandTheme, useBrandTypography} from '../../src/brand';
+import {useBrandTheme, useBrandTypography} from '../../src/brand';
+import {AppHeader} from '../../src/navigation-ui';
+
 import {LibraryIcon} from '../../src/library-icons';
 
 export default function Inbox() {
@@ -19,7 +21,6 @@ export default function Inbox() {
   const shareInbox = useShareInbox(account?.id, store.sync);
   const p = useBrandTheme();
   const {fontFamily} = useBrandTypography();
-  const dark = useColorScheme() === 'dark';
   const [working, setWorking] = useState<string | null>(null);
   const starLock = useRef(false);
   const [error, setError] = useState('');
@@ -33,8 +34,6 @@ export default function Inbox() {
     ...store.topics.map(topic => ({key: `topic:${topic}`, label: topic}))];
   // Keep a selected topic visible if its final item was reclassified elsewhere.
   if (store.topic && !store.topics.includes(store.topic)) filters.push({key: `topic:${store.topic}`, label: store.topic});
-  const initials = account?.display_name?.trim().split(/\s+/).slice(0, 2)
-    .map(part => Array.from(part)[0]).join('').toLocaleUpperCase() || 'R';
   const retry = () => void store.refresh().catch(() => undefined);
   const deviceAttention = shareInbox.items.filter(item => item.blocked || Boolean(item.error));
   const needsAttention = unavailable.length > 0 || deviceAttention.length > 0 || Boolean(shareInbox.error);
@@ -77,90 +76,70 @@ export default function Inbox() {
     onCaptured={() => router.push('/(account)/incoming-share')}/>;
 
   return <SafeAreaView edges={['top', 'left', 'right']} style={{flex: 1, backgroundColor: p.background}}>
-    <StatusBar style={dark ? 'light' : 'dark'}/>
+
     <FlatList ref={list} data={usable} keyExtractor={item => item.id}
-      contentContainerStyle={{paddingHorizontal: 24, paddingTop: 20, paddingBottom: 100,
-        maxWidth: 520, width: '100%', alignSelf: 'center', flexGrow: 1}}
+      contentContainerStyle={{paddingHorizontal: tokens.space.large, paddingTop: tokens.space.regular, paddingBottom: tokens.geometry.listBottomClearance,
+        maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
       refreshing={store.loading} onRefresh={retry}
       onEndReachedThreshold={0.4} onEndReached={() => {
         if (store.hasMore && !store.loading && !store.error) void store.more().catch(() => undefined);
       }}
       initialNumToRender={12} maxToRenderPerBatch={12} windowSize={7}
-      ItemSeparatorComponent={() => <View style={{height: 1, marginLeft: 76, backgroundColor: p.line}}/>}
+      ItemSeparatorComponent={() => <Divider inset={tokens.geometry.thumbnail + tokens.space.medium}/> }
       ListHeaderComponent={<View>
-        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12}}>
-          <BrandLockup logoSize={40} wordmarkSize={22}/>
-          <Pressable accessibilityRole="button" accessibilityLabel="Account and settings"
-            onPress={() => router.push('/(account)/account')}
-            style={({pressed}) => ({width: 46, height: 46, borderRadius: 23, backgroundColor: p.avatar,
-              alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1})}>
-            <Text maxFontSizeMultiplier={1.5} style={{fontSize: 21, fontWeight: '600', color: p.onAvatar}}>{initials}</Text>
-          </Pressable>
-        </View>
-        <Text accessibilityRole="header" style={{fontFamily, color: p.primaryText, fontSize: 42,
-          letterSpacing: -0.8, marginTop: 20, marginBottom: 20}}>{store.archived ? 'Your archive.' : 'Your library.'}</Text>
+        <AppHeader name={account?.display_name} onAccount={() => router.push('/(account)/account')}/>
+        <Type accessibilityRole="header" style={{fontFamily, color: p.primaryText, ...tokens.type.display, marginTop: tokens.space.regular, marginBottom: tokens.space.regular}}>{store.archived ? 'Your archive.' : 'Your library.'}</Type>
         <Pressable accessibilityRole="button" accessibilityLabel="Search anything you've saved"
           onPress={() => router.navigate('/(account)/search')}
-          style={({pressed}) => ({minHeight: 52, borderWidth: 1, borderColor: p.line, borderRadius: 18,
-            backgroundColor: p.surface, paddingHorizontal: 16, paddingVertical: 12,
-            flexDirection: 'row', alignItems: 'center', gap: 12, opacity: pressed ? 0.7 : 1})}>
+          style={({pressed}) => ({minHeight: tokens.touch, borderWidth: 1, borderColor: p.line, borderRadius: tokens.radii.button,
+            backgroundColor: p.surface, paddingHorizontal: tokens.space.medium, paddingVertical: tokens.space.compact,
+            flexDirection: 'row', alignItems: 'center', gap: tokens.space.compact, opacity: pressed ? 0.7 : 1})}>
           <LibraryIcon kind="search" color={p.primaryText}/>
-          <Text style={{flex: 1, fontSize: 15, lineHeight: 22, color: p.secondaryText}}>Search anything you've saved…</Text>
+          <Type style={{flex: 1, ...tokens.type.secondary,  color: p.secondaryText}}>Search anything you've saved…</Type>
         </Pressable>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{gap: 7, paddingVertical: 16, alignItems: 'center'}}>
-          {filters.map(filter => {
-            const selected = selectedFilter === filter.key;
-            return <Pressable key={filter.key} accessibilityRole="button" accessibilityLabel={`Filter: ${filter.label}`}
-              accessibilityState={{selected}} disabled={store.loading} onPress={() => selectFilter(filter.key)}
-              style={{minHeight: 44, borderRadius: 26, paddingHorizontal: 16, justifyContent: 'center',
-                borderWidth: 1, borderColor: selected ? p.button : p.line, backgroundColor: selected ? p.button : 'transparent'}}>
-              <Text style={{fontSize: 14, lineHeight: 20, fontWeight: '600', color: selected ? p.onButton : p.primaryText}}>{filter.label}</Text>
-            </Pressable>;
-          })}
+          contentContainerStyle={{gap: tokens.space.small, paddingVertical: tokens.space.medium, alignItems: 'center'}}>
+          {filters.map(filter => <FilterChip key={filter.key} label={filter.label}
+            selected={selectedFilter === filter.key} disabled={store.loading} onPress={() => selectFilter(filter.key)}/>)}
         </ScrollView>
-        <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2}}>
-          <Text accessibilityRole="header" style={{flex: 1, color: p.primaryText, fontWeight: '700', fontSize: 18, lineHeight: 25}}>Recently saved</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Sort: ${store.order === 'newest' ? 'Newest' : 'Oldest'}`}
-            disabled={store.loading} onPress={sort} style={{minHeight: 48, justifyContent: 'center', paddingHorizontal: 4}}>
-            <Text style={{color: p.primaryText, fontSize: 14}}>{store.order === 'newest' ? 'Newest' : 'Oldest'}  ⌄</Text>
-          </Pressable>
-        </View>
-        {(store.error || error) ? <View style={{gap: 4, paddingVertical: 8}}>
-          <Text accessibilityRole="alert" style={{color: p.error, lineHeight: 21}}>{store.error || error}</Text>
-          <Pressable accessibilityRole="button" onPress={retry} style={{minHeight: 48, justifyContent: 'center'}}>
-            <Text style={{color: p.primaryText, fontWeight: '600'}}>Try again</Text>
+        <SectionHeader title="Recently saved" action={<Pressable accessibilityRole="button"
+          accessibilityLabel={`Sort: ${store.order === 'newest' ? 'Newest' : 'Oldest'}`}
+          disabled={store.loading} onPress={sort} style={{minHeight: tokens.touch, justifyContent: 'center', paddingHorizontal: tokens.space.tiny}}>
+          <View style={{flexDirection:'row',alignItems:'center',gap:tokens.space.small}}>
+            <Type variant="secondary">{store.order === 'newest' ? 'Newest' : 'Oldest'}</Type><Icon name="down"/>
+          </View>
+        </Pressable>}/>
+        {(store.error || error) ? <View style={{gap: tokens.space.tiny, paddingVertical: tokens.space.small}}>
+          <Type accessibilityRole="alert" style={{color: p.error, }}>{store.error || error}</Type>
+          <Pressable accessibilityRole="button" onPress={retry} style={{minHeight: tokens.touch, justifyContent: 'center'}}>
+            <Type style={{color: p.primaryText, fontWeight: '600'}}>Try again</Type>
           </Pressable>
         </View> : null}
-        {!!store.notice && <Text accessibilityLiveRegion="polite" style={{color: p.secondaryText, lineHeight: 21, paddingVertical: 8}}>{store.notice}</Text>}
-        {needsAttention && <View style={{borderWidth: 1, borderColor: p.line, borderRadius: 14, padding: 12, marginVertical: 8, gap: 6}}>
-          <Text style={{color: p.primaryText, fontWeight: '600'}}>Needs attention</Text>
+        {!!store.notice && <Notice kind="success">{store.notice}</Notice>}
+        {needsAttention && <View style={{borderWidth: 1, borderColor: p.line, borderRadius: tokens.radii.tile, padding: tokens.space.compact, marginVertical: tokens.space.small, gap: tokens.space.tiny}}>
+          <Type style={{color: p.primaryText, fontWeight: '600'}}>Needs attention</Type>
           {(deviceAttention.length > 0 || Boolean(shareInbox.error)) && <Pressable accessibilityRole="button"
-            onPress={() => router.push('/(account)/incoming-share')} style={{minHeight: 48, justifyContent: 'center'}}>
-            <Text style={{color: p.secondaryText}}>Review device shares and retry ›</Text>
+            onPress={() => router.push('/(account)/incoming-share')} style={{minHeight: tokens.touch, justifyContent: 'center'}}>
+            <Type style={{color: p.secondaryText}}>Review device shares and retry</Type>
           </Pressable>}
           {unavailable.map(item => <Pressable key={item.id} accessibilityRole="button"
             onPress={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
-            style={{minHeight: 48, justifyContent: 'center'}}>
-            <Text style={{color: p.secondaryText}}>{item.title || 'Saved original unavailable'} ›</Text>
+            style={{minHeight: tokens.touch, justifyContent: 'center'}}>
+            <Type style={{color: p.secondaryText}}>{item.title || 'Saved original unavailable'}</Type>
           </Pressable>)}
         </View>}
       </View>}
       renderItem={({item}) => <MemoryCard memory={item} busy={Boolean(working)}
         onOpen={() => router.push({pathname: '/(account)/memory/[id]', params: {id: item.id}})}
         onStar={() => void toggle(item)}/>}
-      ListEmptyComponent={!store.loading && !store.error ? <View style={{gap: 12, paddingVertical: 32}}>
-        <Text style={{color: p.primaryText, fontSize: 21, fontWeight: '600'}}>
-          {mode === 'pending' ? 'Your originals need attention.' : 'Nothing saved here yet.'}
-        </Text>
-        <Pressable accessibilityRole="button" onPress={() => selectFilter('all')} style={{minHeight: 48, justifyContent: 'center'}}>
-          <Text style={{color: p.primaryText, fontWeight: '600'}}>Show all memories</Text>
-        </Pressable>
-      </View> : undefined}
-      ListFooterComponent={store.loading ? <ActivityIndicator accessibilityLabel="Loading memories" color={p.brand}/> :
+      ListEmptyComponent={!store.loading && !store.error ? <EmptyState
+        title={mode === 'pending' ? 'Your originals need attention.' : 'Nothing saved here yet.'}
+        description={mode === 'pending' ? 'Review Needs attention above.' : 'Try All to see your other saved memories.'}
+        retryLabel="Show all memories" onRetry={() => selectFilter('all')}/> : undefined}
+      ListFooterComponent={store.loading ? <LoadingIndicator accessibilityLabel="Loading memories" color={p.brand}/> :
         store.hasMore ? <Pressable accessibilityRole="button" onPress={() => void store.more().catch(() => undefined)}
-          style={{minHeight: 48, justifyContent: 'center', alignItems: 'center'}}>
-          <Text style={{color: p.primaryText}}>Load more memories</Text>
+          style={{minHeight: tokens.touch, justifyContent: 'center', alignItems: 'center'}}>
+          <Type style={{color: p.primaryText}}>Load more memories</Type>
         </Pressable> : undefined}/>
   </SafeAreaView>;
 }

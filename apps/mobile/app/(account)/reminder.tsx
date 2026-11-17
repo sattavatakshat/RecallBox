@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import {useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import * as Crypto from 'expo-crypto';
@@ -72,7 +72,7 @@ export default function NewReminder(){
     }finally{setBusy(false);}
   }
   return <Screen compact>
-    <TextAction label="← Memory" onPress={back}/>
+    <TextAction icon="back" label="Memory" onPress={back}/>
     <Type title>Remind me.</Type>
     <Type muted>Bring a saved thing back at the right moment.</Type>
     {!memoryId&&<Notice kind="error">Open a saved memory to create a reminder.</Notice>}

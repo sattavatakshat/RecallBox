@@ -1,10 +1,11 @@
-import React,{useCallback,useRef,useState} from 'react';
-import {Alert,Linking,View} from 'react-native';
-import {router,useFocusEffect,useLocalSearchParams,usePreventRemove} from 'expo-router';
+import {tokens} from '../../../src/theme';
+import {useCallback, useRef, useState} from 'react';
+import {Alert, Linking, View} from 'react-native';
+import {router, useFocusEffect, useLocalSearchParams, usePreventRemove} from 'expo-router';
 import * as Crypto from 'expo-crypto';
-import {ApiError,TripItem,TripShortlist,tripApi} from '../../../src/api';
+import {ApiError, TripItem, TripShortlist, tripApi} from '../../../src/api';
 import {useSession} from '../../../src/session';
-import {Button,Input,Notice,Screen,TextAction,Type,usePalette} from '../../../src/ui';
+import {Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../../src/ui';
 
 const validDate=(v:string)=>!v || (/^\d{4}-\d{2}-\d{2}$/.test(v) &&
   !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v);
@@ -82,7 +83,7 @@ export default function TripShortlistScreen(){
     catch{setError('Could not open the saved original.');}
   }
   return <Screen compact>
-    <TextAction label="← Memory" onPress={()=>record?router.replace({
+    <TextAction icon="back" label="Memory" onPress={()=>record?router.replace({
       pathname:'/(account)/memory/[id]',params:{id:record.source_memory_id}}):router.back()}/>
     <Type variant="eyebrow" muted>PLACES YOU SAVED</Type>
     <Type title>Trip shortlist.</Type>
@@ -97,7 +98,7 @@ export default function TripShortlistScreen(){
       <Input label="End date (optional)" value={end} onChangeText={setEnd}
         maxLength={10} placeholder="YYYY-MM-DD" autoCorrect={false}/>
       <Type variant="section">Saved inspiration</Type>
-      <View style={{backgroundColor:p.surface,padding:16,borderRadius:16,gap:7}}>
+      <View style={{backgroundColor:p.surface,padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.small}}>
         <Type variant="label">{record.source_title||'Saved travel source'}</Type>
         <Type muted variant="caption">The original guide is not proof of an address, opening hour or journey time.</Type>
         <TextAction label="Open saved source" onPress={()=>void openSource()}/>
@@ -105,7 +106,7 @@ export default function TripShortlistScreen(){
       <Notice>No invented destinations, business hours or transit times. Add places yourself and arrange days only after confirming details.</Notice>
       <Type variant="section">Your shortlist · {items.length}</Type>
       {items.map((item,index)=><View key={item.id} style={{backgroundColor:p.surface,
-        padding:14,borderRadius:16,gap:8,borderWidth:1,borderColor:p.line}}>
+        padding: tokens.space.compact,borderRadius: tokens.radii.medium,gap: tokens.space.small,borderWidth:1,borderColor:p.line}}>
         <Input label={`Place or inspiration ${index+1}`} value={item.label}
           maxLength={160} onChangeText={value=>updateItem(item.id,{label:value})}/>
         <Input label="Your notes (optional)" value={item.note}
@@ -118,7 +119,7 @@ export default function TripShortlistScreen(){
         <Type muted variant="caption">{item.origin==='source'
           ? 'Linked to your saved travel inspiration (not verified as a physical place)'
           : 'Entered by you'}</Type>
-        <View style={{flexDirection:'row',gap:12}}>
+        <View style={{flexDirection:'row',gap: tokens.space.compact}}>
           <TextAction label="Move up" disabled={index===0} onPress={()=>setItems(old=>{
             const copy=[...old];
             if(index>0 && copy[index] && copy[index-1]) {

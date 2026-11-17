@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import {tokens} from '../../src/theme';
+import {useState} from 'react';
 import {View} from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {useMemories} from '../../src/memories';
@@ -27,19 +28,19 @@ export default function Search() {
   }
 
   return <Screen compact>
-    <TextAction label="← Library" onPress={() => router.dismissTo('/(account)')}/>
+    <TextAction icon="back" label="Library" onPress={() => router.dismissTo('/(account)')}/>
     <Type title>Find it again.</Type>
     <Input label="Search your saved things" value={query} onChangeText={setQuery}
       autoFocus autoCapitalize="none" autoCorrect={false} maxLength={200}
       returnKeyType="search" onSubmitEditing={() => submit()}
       placeholder="That Goa guide, Java tutorial…"/>
     <Button label="Search library" disabled={!query.trim()} onPress={() => submit()}/>
-    <View style={{gap:8,marginTop:16}}>
+    <View style={{gap: tokens.space.small,marginTop: tokens.space.medium}}>
       <Type variant="section">{suggestions.length ? 'From your Library' :
         emptyLibrary ? 'Your Library is empty.' :
           mode === 'pending' ? 'No searchable saves yet.' : 'Search what you saved'}</Type>
       {suggestions.length ? suggestions.map(item =>
-        <View key={item.id} style={{gap:4}}>
+        <View key={item.id} style={{gap: tokens.space.tiny}}>
           <TextAction label={item.title} onPress={() => submit(item.title)}/>
         </View>) :
         <Type muted>{emptyLibrary

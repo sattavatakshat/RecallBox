@@ -1,4 +1,6 @@
-import React, {useCallback, useRef, useState} from 'react';
+import {tokens} from '../../src/theme';
+import {Icon} from '../../src/icons';
+import {useCallback, useRef, useState} from 'react';
 import {Alert, Pressable, View} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams, usePreventRemove} from 'expo-router';
 import {ApiError, Collection, Memory, collectionsApi} from '../../src/api';
@@ -116,7 +118,7 @@ export default function OrganizeMemory() {
     {memory&&<>
       <Type variant="section">{memory.title||'Saved memory'}</Type>
       <Type variant="label">Primary topic (optional)</Type>
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
         <FilterChip label="Not categorized" selected={chosenTopic===null}
           onPress={()=>setTopic(memory.suggested_topic?'Uncategorized':null)}/>
         {TOPICS.map(name=><FilterChip key={name} label={name} selected={chosenTopic===name}
@@ -130,15 +132,15 @@ export default function OrganizeMemory() {
         No reliable category suggestion was found. Pick one if you like.
       </Type>}
       {topic!==null && <TextAction label="Use source suggestion"
-        onPress={()=>setTopic(null)}/>} 
+        onPress={()=>setTopic(null)}/>}
       <Type variant="label">Personal tags</Type>
-      {tags?.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+      {tags?.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
         {tags.map(label=><Pressable key={label} accessibilityRole="button"
           accessibilityLabel={`Remove tag ${label}`}
           onPress={()=>setTags(current=>(current??[]).filter(x=>x!==label))}
-          style={{minHeight:48,justifyContent:'center',paddingHorizontal:14,borderRadius:24,
+          style={{minHeight: tokens.touch,justifyContent:'center',paddingHorizontal: tokens.space.compact,borderRadius: tokens.radii.large,
             borderWidth:1,borderColor:p.line,backgroundColor:p.surface}}>
-          <Type variant="caption">{label}  ×</Type>
+          <View style={{flexDirection:'row',alignItems:'center',gap: tokens.space.small}}><Type variant="caption">{label}</Type><Icon name="close" size={16}/></View>
         </Pressable>)}
       </View>:<Type muted variant="caption">No personal tags yet.</Type>}
       <Input label="New tag" value={tagDraft} onChangeText={setTagDraft}
@@ -147,7 +149,7 @@ export default function OrganizeMemory() {
         onPress={addTag}/>
       {(topic!==null||tags!==null)&&<TextAction label="Reset personal topic and tags"
         disabled={busy} onPress={()=>{setTopic(null);setTags(null);setTagDraft('');}}/>}
-      <View style={{backgroundColor:p.surfaceMuted,padding:16,borderRadius:16,gap:8}}>
+      <View style={{backgroundColor:p.surfaceMuted,padding: tokens.space.medium,borderRadius: tokens.radii.medium,gap: tokens.space.small}}>
         <Type variant="label">Source information</Type>
         <Type muted variant="caption">{memory.labels.length
           ? memory.labels.join(' · '):'No source labels available.'}</Type>
@@ -161,10 +163,10 @@ export default function OrganizeMemory() {
         accessibilityState={{checked:selectedMembership.includes(group.id),disabled:busy}}
         disabled={busy} onPress={()=>setSelectedMembership(current=>
           current.includes(group.id)?current.filter(x=>x!==group.id):[...current,group.id])}
-        style={{minHeight:52,paddingHorizontal:14,borderRadius:12,
+        style={{minHeight: tokens.touch,paddingHorizontal: tokens.space.compact,borderRadius: tokens.radii.tile,
           borderWidth:1,borderColor:p.line,backgroundColor:p.surface,
-          flexDirection:'row',alignItems:'center',gap:12}}>
-        <Type style={{fontSize:20}}>{selectedMembership.includes(group.id)?'☑':'□'}</Type>
+          flexDirection:'row',alignItems:'center',gap: tokens.space.compact}}>
+        <Icon name={selectedMembership.includes(group.id)?'checked':'square'}/>
         <Type variant="label">{group.name}</Type>
       </Pressable>)}
       {!allCollections.length&&!collectionError&&<Type muted variant="caption">

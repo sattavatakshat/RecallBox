@@ -5,7 +5,7 @@
     <item name="android:windowNoTitle">true</item>
     <item name="android:backgroundDimEnabled">true</item>
     <item name="android:backgroundDimAmount">0.12</item>
-    <item name="android:colorAccent">#DCEC7C</item>
+    <item name="android:colorAccent">@color/recallbox_accent</item>
     <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:navigationBarColor">@android:color/transparent</item>
     <item name="android:windowLightStatusBar">true</item>

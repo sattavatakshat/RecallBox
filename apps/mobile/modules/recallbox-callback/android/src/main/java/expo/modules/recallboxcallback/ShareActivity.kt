@@ -10,10 +10,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
+import android.widget.ImageView
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -34,10 +36,9 @@ class ShareActivity : Activity() {
   private val update: () -> Unit = { handler.post { updateState() } }
   private val dismiss = Runnable { finish() }
   private val dark get() = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-  private val ink get() = Color.parseColor(if (dark) "#F7F5EB" else "#082F23")
-  private val paper get() = Color.parseColor(if (dark) "#102F21" else "#FCF4EA")
-  private val accent get() = Color.parseColor("#DCEC7C")
-  private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
+  private val ink get() = getColor(R.color.recallbox_primary_text)
+  private val paper get() = getColor(R.color.recallbox_sheet_surface)
+  private fun dimen(id: Int) = resources.getDimensionPixelSize(id)
   override fun onCreate(state: Bundle?) {
     super.onCreate(state)
     window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -100,45 +101,65 @@ class ShareActivity : Activity() {
     lastState = state; handler.removeCallbacks(dismiss)
     val root = LinearLayout(this).apply {
       orientation=LinearLayout.VERTICAL; gravity=Gravity.BOTTOM
-      setPadding(dp(12),0,dp(12),dp(12)); setBackgroundColor(Color.TRANSPARENT)
+      setPadding(dimen(R.dimen.recallbox_space_compact),0,dimen(R.dimen.recallbox_space_compact),dimen(R.dimen.recallbox_space_compact)); setBackgroundColor(Color.TRANSPARENT)
       fitsSystemWindows=true
     }
     root.setOnApplyWindowInsetsListener { view, insets ->
       if (Build.VERSION.SDK_INT >= 30) {
         val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
-        view.setPadding(bars.left+dp(12),bars.top+dp(12),bars.right+dp(12),bars.bottom+dp(12))
+        view.setPadding(bars.left+dimen(R.dimen.recallbox_space_compact),bars.top+dimen(R.dimen.recallbox_space_compact),bars.right+dimen(R.dimen.recallbox_space_compact),bars.bottom+dimen(R.dimen.recallbox_space_compact))
       } else {
         @Suppress("DEPRECATION")
-        view.setPadding(insets.systemWindowInsetLeft+dp(12),insets.systemWindowInsetTop+dp(12),
-          insets.systemWindowInsetRight+dp(12),insets.systemWindowInsetBottom+dp(12))
+        view.setPadding(insets.systemWindowInsetLeft+dimen(R.dimen.recallbox_space_compact),insets.systemWindowInsetTop+dimen(R.dimen.recallbox_space_compact),
+          insets.systemWindowInsetRight+dimen(R.dimen.recallbox_space_compact),insets.systemWindowInsetBottom+dimen(R.dimen.recallbox_space_compact))
       }
       insets
     }
-    @Suppress("DEPRECATION")
-    window.decorView.systemUiVisibility = if(dark) 0 else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-    val card = LinearLayout(this).apply {
-      orientation=LinearLayout.VERTICAL; setPadding(dp(22),dp(12),dp(22),dp(24)); elevation=dp(10).toFloat()
-      background=GradientDrawable().apply { setColor(paper); cornerRadius=dp(26).toFloat() }
+    if (Build.VERSION.SDK_INT >= 30) {
+      val lightBars = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+        android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+      window.insetsController?.setSystemBarsAppearance(if(dark) 0 else lightBars, lightBars)
+    } else {
+      @Suppress("DEPRECATION")
+      val lightNavigation = if(Build.VERSION.SDK_INT >= 26) View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
+      @Suppress("DEPRECATION")
+      window.decorView.systemUiVisibility = if(dark) 0 else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or lightNavigation
     }
-    val handle = View(this).apply { background=GradientDrawable().apply {setColor(if (dark) 0xff759079.toInt() else 0xffa2a79d.toInt());cornerRadius=dp(3).toFloat()} }
-    card.addView(handle,LinearLayout.LayoutParams(dp(34),dp(4)).apply {gravity=Gravity.CENTER_HORIZONTAL;bottomMargin=dp(22)})
+    val card = LinearLayout(this).apply {
+      orientation=LinearLayout.VERTICAL; setPadding(dimen(R.dimen.recallbox_space_large),dimen(R.dimen.recallbox_space_compact),dimen(R.dimen.recallbox_space_large),dimen(R.dimen.recallbox_space_large)); elevation=resources.getDimension(R.dimen.recallbox_elevation_sheet)
+      background=GradientDrawable().apply { setColor(paper); cornerRadius=dimen(R.dimen.recallbox_radius_large).toFloat() }
+    }
+    val handle = View(this).apply { background=GradientDrawable().apply {setColor(getColor(R.color.recallbox_muted_text));cornerRadius=dimen(R.dimen.recallbox_radius_tiny).toFloat()} }
+    card.addView(handle,LinearLayout.LayoutParams(dimen(R.dimen.recallbox_sheet_handle_width),dimen(R.dimen.recallbox_sheet_handle_height)).apply {gravity=Gravity.CENTER_HORIZONTAL;bottomMargin=dimen(R.dimen.recallbox_space_large)})
     val row = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
-    val symbol = TextView(this).apply {
-      text=when(state){"saved"->"✓";"failed"->"!";"saving"->"…";else->"↥"}
-      textSize=30f; gravity=Gravity.CENTER; typeface=Typeface.DEFAULT_BOLD
-      setTextColor(if(state=="failed") ink else Color.parseColor("#103322"))
-      background=GradientDrawable().apply {setColor(if(state=="failed") (if(dark) 0xff50352e.toInt() else 0xfff2dcd1.toInt()) else accent);shape=GradientDrawable.OVAL}
+    // Same Lucide geometry as React, generated without starting React/Metro.
+    val symbol = ImageView(this).apply {
+      val icon = when(state) {
+        "saved" -> R.drawable.recallbox_icon_check
+        "failed" -> R.drawable.recallbox_icon_triangle_alert
+        "saving" -> R.drawable.recallbox_icon_clock
+        else -> R.drawable.recallbox_icon_upload
+      }
+      setImageDrawable(getDrawable(icon)?.mutate()?.apply {
+        setTint(getColor(if(state=="failed") R.color.recallbox_error else R.color.recallbox_on_highlight))
+      })
+      setPadding(dimen(R.dimen.recallbox_space_compact),dimen(R.dimen.recallbox_space_compact),
+        dimen(R.dimen.recallbox_space_compact),dimen(R.dimen.recallbox_space_compact))
+      background=GradientDrawable().apply {
+        setColor(getColor(if(state=="failed") R.color.recallbox_error_surface else R.color.recallbox_highlight))
+        shape=GradientDrawable.OVAL
+      }
       importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
-    row.addView(symbol,LinearLayout.LayoutParams(dp(48),dp(48)).apply {rightMargin=dp(16)})
+    row.addView(symbol,LinearLayout.LayoutParams(dimen(R.dimen.recallbox_touch),dimen(R.dimen.recallbox_touch)).apply {rightMargin=dimen(R.dimen.recallbox_space_medium)})
     val copy = LinearLayout(this).apply {orientation=LinearLayout.VERTICAL}
-    val heading=TextView(this).apply {text=title;textSize=21f;setTextColor(ink)
+    val heading=TextView(this).apply {text=title;setTextSize(TypedValue.COMPLEX_UNIT_PX,resources.getDimension(R.dimen.recallbox_type_native_heading));setTextColor(ink)
       typeface=try {Typeface.createFromAsset(assets,"DMSerifDisplay-Regular.ttf")}
         catch (_: Exception) {Typeface.create("serif",Typeface.BOLD)}}
     copy.addView(heading)
-    copy.addView(TextView(this).apply {text=subtitle;textSize=14f;setTextColor(ink);setPadding(0,dp(5),0,0)})
+    copy.addView(TextView(this).apply {text=subtitle;setTextSize(TypedValue.COMPLEX_UNIT_PX,resources.getDimension(R.dimen.recallbox_type_secondary));setTextColor(ink);setPadding(0,dimen(R.dimen.recallbox_space_tiny),0,0)})
     row.addView(copy,LinearLayout.LayoutParams(0,LinearLayout.LayoutParams.WRAP_CONTENT,1f));card.addView(row)
-    if(detail.isNotBlank()) card.addView(TextView(this).apply {text=detail;textSize=14f;setTextColor(ink);setPadding(0,dp(16),0,dp(8))})
+    if(detail.isNotBlank()) card.addView(TextView(this).apply {text=detail;setTextSize(TypedValue.COMPLEX_UNIT_PX,resources.getDimension(R.dimen.recallbox_type_secondary));setTextColor(ink);setPadding(0,dimen(R.dimen.recallbox_space_medium),0,dimen(R.dimen.recallbox_space_small))})
     if(state=="failed") {
       addButton(card,"Retry") { receive() }
       addButton(card,"Cancel") { finish() }
@@ -162,11 +183,12 @@ class ShareActivity : Activity() {
     }
   }
   private fun addButton(parent: LinearLayout, label: String, action: ()->Unit) {
-    parent.addView(Button(this).apply {text=label;isAllCaps=false;minHeight=dp(48)
-      backgroundTintList=android.content.res.ColorStateList.valueOf(if(dark) accent else Color.parseColor("#063824"))
-      setTextColor(if(dark) Color.parseColor("#102312") else Color.parseColor("#FFFDF5"))
+    parent.addView(Button(this).apply {text=label;isAllCaps=false;minHeight=dimen(R.dimen.recallbox_touch)
+      setTextSize(TypedValue.COMPLEX_UNIT_PX,resources.getDimension(R.dimen.recallbox_type_button))
+      backgroundTintList=android.content.res.ColorStateList.valueOf(getColor(R.color.recallbox_accent))
+      setTextColor(getColor(R.color.recallbox_on_accent))
       setOnClickListener {action()}},
-      LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT).apply {topMargin=dp(8)})
+      LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT).apply {topMargin=dimen(R.dimen.recallbox_space_small)})
   }
   @Deprecated("Deprecated in Java") override fun onBackPressed() {
     if(receiving) return // Finish copying granted streams before permitting dismissal.
