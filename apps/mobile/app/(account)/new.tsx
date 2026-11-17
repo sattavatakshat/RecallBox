@@ -1,66 +1,40 @@
-import React, { useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
-import { router, usePreventRemove } from 'expo-router';
+import React, {useRef,useState} from 'react';
 import * as Crypto from 'expo-crypto';
-import { ApiError } from '../../src/api';
-import { errorMessage, useMemories } from '../../src/memories';
-import { Button, Input, Notice, Screen, TextAction, Type, usePalette } from '../../src/ui';
+import {useMemories} from '../../src/memories';
+import {useManualDraft,useCaptureExit} from '../../src/manual-save-state';
+import {manualSaveError,definitiveRejection} from '../../src/manual-save-model';
+import {CaptureEditor,CaptureInput,CaptureButton,CaptureMessage} from '../../src/manual-save-ui';
 
 export default function NewNote() {
-  const {create, finishCapture} = useMemories();
-  const palette = usePalette();
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const attempt = useRef<{key: string; title: string; content: string} | null>(null);
-  const [locked, setLocked] = useState(false);
-  const [leaving, setLeaving] = useState(false);
-  const release = usePreventRemove(Boolean(title || content) && !leaving, ({repeat}) => {
-    if (busy) { Alert.alert('Save in progress', 'Wait for the save to finish before leaving.'); return; }
-    Alert.alert(locked ? 'Save not confirmed' : 'Leave this draft?', locked
-      ? 'The server may have saved this note. Retry safely here, or check your inbox before creating it again.'
-      : 'This draft is only on this screen. Leaving discards it.', [
-      {text: 'Keep writing', style: 'cancel'},
-      {text: 'Leave', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
-    ]);
-  });
+  const store=useMemories();const state=useManualDraft('note');const working=useRef(false);
+  const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+  const locked=Boolean(state.draft.attempt);
+  const exit=useCaptureExit(Boolean(state.draft.title||state.draft.content),locked,working);
   async function save() {
-    if (busy || !content.trim()) return;
-    setBusy(true); setError('');
-    if (!attempt.current) attempt.current = {key: Crypto.randomUUID(), title, content};
-    setLocked(true);
+    if(working.current||!state.isCurrent()||!state.current.current.content.trim())return;
+    working.current=true;setBusy(true);setError('');
+    const request=state.current.current;
+    const key=request.attempt?.key??Crypto.randomUUID();state.update({attempt:{key}});
     try {
-      const note = await create({title: attempt.current.title, content: attempt.current.content}, attempt.current.key);
-      await finishCapture(note);
-      setLeaving(true);
-      release();
-      router.dismissTo('/(account)');
-    } catch (cause) {
-      setError(errorMessage(cause));
-      // Definitive validation/auth rejection did not create a note. Network/5xx
-      // ambiguity keeps the original request+key frozen for an identical retry.
-      if (cause instanceof ApiError && [400, 401, 413, 422].includes(cause.status)) {
-        attempt.current = null; setLocked(false);
-      }
-    } finally { setBusy(false); }
+      const saved=await store.create({title:request.title,content:request.content},key);
+      if(!state.isCurrent())return;
+      await store.finishCapture(saved);state.clear();exit.finish();
+    } catch(cause) {
+      setError(manualSaveError(cause));
+      if(definitiveRejection(cause))state.update({attempt:null});
+    } finally {working.current=false;setBusy(false);}
   }
-  return <Screen compact>
-    <View style={{alignItems: 'center', marginBottom: 12}}><View style={{width: 38, height: 4, borderRadius: 8, backgroundColor: palette.line}} /></View>
-    <TextAction label="Close note composer" onPress={() => router.back()}/>
-    <Type variant="section">A thought worth keeping.</Type>
-    <Input label="Title" value={title} onChangeText={setTitle}
-      maxLength={240} editable={!locked && !busy} placeholder="Give it a name"/>
-    <Input label="Your note" value={content} onChangeText={setContent}
-      maxLength={100000} multiline autoFocus={!locked}
-      textAlignVertical="top" style={{minHeight: 250}} editable={!locked && !busy}
-      placeholder="Write anything..."/>
-    {!!error && <Notice kind="error">{error}</Notice>}
-    {locked && !busy && <Notice>
-      The save isn't confirmed. Retry uses the same request so it won't create a duplicate.
-    </Notice>}
-    <Button label={locked ? 'Retry this save' : 'Save note'} busy={busy}
-      disabled={!content.trim()} onPress={() => void save()}/>
-    <Type muted variant="caption">Title is optional. Your note is only marked saved after confirmation.</Type>
-  </Screen>;
+  return <CaptureEditor title="Write a note." subtitle="Keep a thought or idea. A title is optional."
+    onCancel={exit.cancel} busy={busy}>
+    <CaptureInput label="Title (optional)" value={state.draft.title} onChangeText={title=>state.update({title})}
+      maxLength={240} editable={!busy&&!locked} placeholder="Give it a name"/>
+    <CaptureInput label="Your note" value={state.draft.content} onChangeText={content=>state.update({content})}
+      autoFocus multiline maxLength={100000} textAlignVertical="top" style={{minHeight:240}}
+      editable={!busy&&!locked} placeholder="Write anything…"/>
+    {!!error&&<CaptureMessage error>{error}</CaptureMessage>}
+    {locked&&!busy&&<CaptureMessage>Save not confirmed. Retry keeps your original note and request key.</CaptureMessage>}
+    <CaptureButton label={locked?'Retry save':'Save note'} onPress={()=>void save()}
+      busy={busy} disabled={!state.draft.content.trim()}/>
+    <CaptureMessage>Drafts remain in this account while RecallBox stays open. A connection is required to save them.</CaptureMessage>
+  </CaptureEditor>;
 }

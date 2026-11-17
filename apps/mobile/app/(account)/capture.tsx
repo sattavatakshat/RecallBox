@@ -1,114 +1,113 @@
-import { useRef, useState } from 'react';
-import {Alert} from 'react-native';
-import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
+import React, {useEffect,useRef,useState} from 'react';
+import {Alert,Image,View} from 'react-native';
+import {router,useLocalSearchParams} from 'expo-router';
 import * as Crypto from 'expo-crypto';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
-import { File } from 'expo-file-system';
-import { memoriesApi, Memory } from '../../src/api';
+import {memoriesApi} from '../../src/api';
+import {useSession} from '../../src/session';
 import {useMemories} from '../../src/memories';
-import { useSession } from '../../src/session';
-import { Button, Input, Notice, Screen, TextAction, Type } from '../../src/ui';
+import {useBrandTheme} from '../../src/brand';
+import {useManualDraft,useCaptureExit} from '../../src/manual-save-state';
+import {CaptureFile,manualSaveError,definitiveRejection} from '../../src/manual-save-model';
+import {choosePhoto,chooseCamera,chooseDocument,inspectSelection,recoverPhoto,removeCachedSelection,selectionError} from '../../src/manual-file-picker';
+import {CaptureEditor,CaptureButton,CaptureMessage} from '../../src/manual-save-ui';
+import {CaptureIcon} from '../../src/manual-save-icons';
 
-type Intent = {key: string; url?: string; uri?: string; mime?: string; name?: string};
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
 export default function Capture() {
-  const {method} = useLocalSearchParams<{method?: string}>();
-  const imageOnly = method === 'image';
-  const pdfOnly = method === 'pdf';
-  const {authorized} = useSession();
-  const store = useMemories();
-  const [url,setUrl] = useState('');
-  const [busy,setBusy] = useState(false);
-  const [message,setMessage] = useState('Articles, screenshots, photos and PDFs. Originals are saved privately. Files up to 8 MiB.');
-  const [pending,setPending] = useState<Intent | null>(null);
-  const [leaving, setLeaving] = useState(false);
-  const lock = useRef(false);
-  const release = usePreventRemove((Boolean(pending || url.trim()) || busy) && !leaving, ({repeat}) => {
-    if (lock.current) {Alert.alert('Save in progress', 'Wait for the save request to finish.');return;}
-    Alert.alert('Leave this capture?', pending
-      ? 'The save is not confirmed. Retry safely here, or check Library before saving again. This draft is only on this screen.'
-      : 'This link has not been saved. Leaving discards your entry.', [
-      {text: 'Keep editing', style: 'cancel'},
-      {text: 'Leave', style: 'destructive', onPress: () => {setLeaving(true);release();repeat();}},
-    ]);
-  });
-  function startAnother() {
-    Alert.alert('Set aside this attempt?', 'It may already have reached the server. Check Library before saving the same item again.', [
-      {text: 'Keep this attempt', style: 'cancel'},
-      {text: 'Start another', onPress: () => {setPending(null);setMessage('Previous save may have succeeded. Check Library before saving it again.');}},
-    ]);
-  }
-  async function save(intent: Intent) {
-    if(lock.current) return;
-    lock.current=true; setBusy(true); setPending(intent); setMessage('Saving your source…');
+  const {method,pick}=useLocalSearchParams<{method?:string;pick?:string}>();
+  const mode=method==='image'?'image':method==='pdf'?'pdf':'capture';
+  return <FileCapture key={mode} mode={mode} autoPick={pick==='1'}/>;
+}
+function FileCapture({mode,autoPick}: {mode:'image'|'pdf'|'capture';autoPick:boolean}) {
+  const {authorized,account}=useSession();const store=useMemories();const p=useBrandTheme();
+  const state=useManualDraft(mode);const working=useRef(false);const started=useRef(false);
+  const [phase,setPhase]=useState<'idle'|'choosing'|'saving'>('idle');const [error,setError]=useState('');
+  const [previewFailed,setPreviewFailed]=useState(false);
+  const locked=Boolean(state.draft.attempt);
+  const exit=useCaptureExit(Boolean(state.draft.file),locked,working);
+  const current=useRef({select,exit,state});current.current={select,exit,state};
+  useEffect(()=>{
+    const task=setTimeout(()=>{
+      if(started.current)return;started.current=true;
+      void (async()=>{
+        if(current.current.state.current.current.file)return;
+        try {
+          const recovered=mode!=='pdf'&&account?await recoverPhoto(account.id):null;
+          if(recovered&&current.current.state.isCurrent()) {
+            const file=await inspectSelection(recovered.uri,recovered.name,mode);
+            current.current.state.update({file,attempt:null});return;
+          }
+        }catch{/* A missing old picker result must not prevent a fresh selection. */}
+        if(autoPick&&current.current.state.isCurrent())void current.current.select(mode==='pdf'?'pdf':'photo');
+      })();
+    },100);
+    return()=>clearTimeout(task);
+  },[mode,autoPick,account?.id]);
+  async function select(kind:'photo'|'camera'|'pdf'|'files') {
+    if(working.current||!state.isCurrent()||!account)return;
+    working.current=true;setPhase('choosing');setError('');
     try {
-      const saved: Memory = await authorized(access => intent.url
-        ? memoriesApi.capture(access,intent.url,intent.key)
-        : memoriesApi.upload(access,intent.uri!,intent.mime!,intent.name!,intent.key));
-      await store.finishCapture(saved);
-      if(intent.uri) { try {new File(intent.uri).delete();} catch {} }
-      setPending(null);
-      setLeaving(true); release();
-      // Navigate immediately after the capture API confirms durable storage.
-      router.dismissTo('/(account)');
-    } catch {setMessage('Save not confirmed. Keep this screen open to retain your input; retry reuses the same request. There is no durable in-app offline outbox. Check file type, size and your connection.');}
-    finally {lock.current=false; setBusy(false);}
-  }
-  async function choose(camera: boolean) {
-    // The Android 16 Photo Picker performs a synchronous MIME query on the
-    // activity thread in this Expo version. DocumentsUI avoids that ANR path.
-    if (!camera) {await document('image');return;}
-    try {
-      if(camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) {setMessage('Camera access is needed to take a photo. You can choose an existing image instead.'); return;}
-      const result = camera ? await ImagePicker.launchCameraAsync({quality:0.8,mediaTypes:['images']})
-        : await ImagePicker.launchImageLibraryAsync({quality:0.8,mediaTypes:['images']});
-      if(result.canceled) return;
-      const asset=result.assets[0]; if(!asset) return;
-      if (asset.fileSize != null && asset.fileSize > MAX_FILE_BYTES) {setMessage('This photo exceeds 8 MiB. Choose a smaller image.'); return;}
-      await save({key:Crypto.randomUUID(),uri:asset.uri,mime:asset.mimeType || 'image/jpeg',
-        name:camera ? `Photo ${new Date().toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}.jpg` : asset.fileName || 'Saved image.jpg'});
-    } catch {setMessage('The image could not be opened. Try another file.');}
-  }
-  async function document(kind: 'image' | 'pdf') {
-    if (busy || lock.current) return;
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: kind === 'image' ? ['image/png', 'image/jpeg', 'image/webp'] : 'application/pdf',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      if (result.canceled) return;
-      const asset = result.assets[0];
-      if (!asset) return;
-      if (asset.size != null && asset.size > MAX_FILE_BYTES) {
-        setMessage('This file exceeds 8 MiB. Choose a smaller file.');
+      const selected=await (kind==='photo'?choosePhoto(account.id):kind==='camera'?chooseCamera(account.id):chooseDocument(kind==='pdf'?'pdf':'image'));
+      if(!state.isCurrent())return;
+      if(!selected) {
+        if(!state.current.current.file)exit.cancelEmpty();
         return;
       }
-      const mime = asset.mimeType || (kind === 'pdf' ? 'application/pdf' : 'application/octet-stream');
-      if (kind === 'pdf' && mime !== 'application/pdf') {
-        setMessage('Choose a PDF document.'); return;
-      }
-      if (kind === 'image' && !['image/png', 'image/jpeg', 'image/webp'].includes(mime)) {
-        setMessage('Choose a JPG, PNG or WebP image.'); return;
-      }
-      await save({key: Crypto.randomUUID(), uri: asset.uri, mime, name: asset.name});
-    } catch {
-      setMessage('Could not open that file. Try selecting it again from Files.');
-    }
+      const file=await inspectSelection(selected.uri,selected.name,mode);
+      if(!state.isCurrent())return;
+      const old=state.current.current.file;
+      state.update({file,attempt:null});setPreviewFailed(false);
+      if(old&&old.uri!==file.uri)removeCachedSelection(old);
+    }catch(cause){if(state.isCurrent())setError(selectionError(cause));}
+    finally{working.current=false;setPhase('idle');}
   }
-  return <Screen><TextAction label="Cancel capture" disabled={busy} onPress={() => router.back()}/>
-    <Type title>{imageOnly ? 'Save a photo.' : pdfOnly ? 'Save a document.' : 'Keep something.'}</Type><Notice>{message}</Notice>
-    {pending ? <><Button label="Retry this save" busy={busy} onPress={() => void save(pending)}/>
-      <TextAction label="Start another capture" disabled={busy} onPress={startAnother}/></> : <>
-      {!imageOnly && !pdfOnly && <><Input label="Public article URL" value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" maxLength={4096} placeholder="https://…"/>
-      <Button label="Save URL" disabled={!/^https?:\/\//i.test(url.trim())} busy={busy} onPress={() => void save({key:Crypto.randomUUID(),url:url.trim()})}/>
-      </>}
-      {!pdfOnly && <><Button label="Choose image or screenshot" disabled={busy} onPress={() => void choose(false)}/>
-      <Button label="Take a photo" disabled={busy} onPress={() => void choose(true)}/></>}
-      {!imageOnly && <Button label="Choose PDF" disabled={busy} onPress={() => void document('pdf')}/>}
-      {pdfOnly && <Type muted>Only PDF documents are supported. Other document formats are not uploaded.</Type>}
-      <Type muted>Restricted pages retain their URL and available metadata. Images are saved as originals; text recognition is not available yet.</Type>
+  function change(kind:'photo'|'camera'|'pdf'|'files') {
+    if(locked)Alert.alert('Set aside the unconfirmed attempt?',
+      'It may already have reached the server. Check Library before uploading it again. Cancelling the picker will keep this attempt.',[
+      {text:'Keep this attempt',style:'cancel'},{text:'Choose another',onPress:()=>void select(kind)},
+    ]);else void select(kind);
+  }
+  async function save() {
+    const file=state.current.current.file;
+    if(working.current||!state.isCurrent()||!file||previewFailed)return;
+    working.current=true;setPhase('saving');setError('');
+    let verified=false;
+    try {
+      await inspectSelection(file.uri,file.name,mode);
+      verified=true;
+      const key=state.current.current.attempt?.key??Crypto.randomUUID();state.update({attempt:{key}});
+      const saved=await authorized(access=>memoriesApi.upload(access,file.uri,file.mime,file.name,key));
+      if(!state.isCurrent())return;
+      await store.finishCapture(saved);state.clear();removeCachedSelection(file);exit.finish();
+    }catch(cause){
+      setError(verified?manualSaveError(cause):selectionError(cause));
+      if(definitiveRejection(cause))state.update({attempt:null});
+    }finally{working.current=false;setPhase('idle');}
+  }
+  const file=state.draft.file;
+  const saving=phase==='saving';const choosing=phase==='choosing';
+  const image=file?.mime.startsWith('image/');
+  return <CaptureEditor title={mode==='pdf'?'Save a PDF.':mode==='image'?'Save a photo.':'Save a file.'}
+    subtitle="Review your selection before saving. Files up to 8 MiB."
+    onCancel={exit.cancel} busy={phase!=='idle'}>
+    {file&&<View style={{gap:14,padding:16,borderRadius:20,backgroundColor:p.surface,borderWidth:1,borderColor:p.line}}>
+      {image?<Image key={file.uri} source={{uri:file.uri}} resizeMode="contain" accessibilityLabel={`Preview of ${file.name}`}
+        style={{width:'100%',height:220,borderRadius:12}} onError={()=>{setPreviewFailed(true);setError('This image preview could not load. Choose another image.');}}/>:
+        <CaptureIcon kind="pdf" color={p.brand}/>}
+      <CaptureMessage>{file.name}</CaptureMessage>
+      <CaptureMessage>{(file.size/(1024*1024)).toFixed(2)} MiB · {file.mime}</CaptureMessage>
+    </View>}
+    {choosing&&<CaptureMessage>Opening or reading your selection…</CaptureMessage>}
+    {!!error&&<CaptureMessage error>{error}</CaptureMessage>}
+    {locked&&!saving&&<CaptureMessage>Save not confirmed. Retry retains the same original file and request key.</CaptureMessage>}
+    {file&&<CaptureButton label={saving?'Uploading…':locked?'Retry save':image?'Save image':'Save PDF'}
+      busy={saving} disabled={choosing||previewFailed} onPress={()=>void save()}/>}
+    {mode!=='pdf'&&<>
+      <CaptureButton quiet label={file?'Choose another image':'Choose image or screenshot'} disabled={phase!=='idle'} onPress={()=>change('photo')}/>
+      <CaptureButton quiet label="Take a photo" disabled={phase!=='idle'} onPress={()=>change('camera')}/>
+      <CaptureButton quiet label="Choose from Files" disabled={phase!=='idle'} onPress={()=>change('files')}/>
     </>}
-  </Screen>;
+    {mode!=='image'&&<CaptureButton quiet label={file?'Choose another PDF':'Choose PDF'} disabled={phase!=='idle'} onPress={()=>change('pdf')}/>}
+    {mode==='capture'&&<CaptureButton quiet label="Paste a link instead" disabled={phase!=='idle'} onPress={()=>router.replace('/(account)/new-link')}/>}
+    <CaptureMessage>{mode==='pdf'?'Only PDF documents are supported.':'Images must be JPG, PNG or WebP.'} A connection is required to save. Selected-file drafts are separate from the native share outbox and are retained only while RecallBox stays open.</CaptureMessage>
+  </CaptureEditor>;
 }

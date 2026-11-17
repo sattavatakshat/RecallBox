@@ -53,7 +53,10 @@ export const memoriesApi = {
       method:'POST', headers:{Authorization:`Bearer ${access}`,'Content-Type':mime,'Idempotency-Key':key},body:file,
       signal:AbortSignal.timeout(60000),
     });
-    if(!response.ok) throw new ApiError(response.status,'upload_failed');
+    if(!response.ok) {
+      const data=await response.json().catch(()=>null);
+      throw new ApiError(response.status,data?.error?.code ?? 'upload_failed');
+    }
     return response.json();
   },
   search: (access: string, q: string, mode='keyword', collection?: string, starred=false) => request<{items: MemorySummary[]; pending_index: number}>(

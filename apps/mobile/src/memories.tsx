@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform, ToastAndroid } from 'react-native';
 import { ApiError, Memory, MemoryCreate, MemoryEdit, MemorySummary, memoriesApi } from './api';
 import { useSession } from './session';
 import {topicOf} from './library-state';
@@ -200,9 +200,11 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     view.current=false;starredView.current=false;topicView.current=null;setTopic(null);setArchived(false);setStarredOnly(false);
     orderView.current='newest';setOrder('newest');
     pageCursor.current=null;setHasMore(false);
-    publish();
+    publish();setInitialized(true);setError('');
     const message='Saved to your Library.';
     setNotice(message);
+    try {if(Platform.OS==='android')ToastAndroid.show(message,ToastAndroid.LONG);}
+    catch {/* Optional feedback must never turn server acknowledgment into a failed save. */}
     setCaptureRevision(value=>value+1);
     if(confirmationTimer.current)clearTimeout(confirmationTimer.current);
     confirmationTimer.current=setTimeout(()=>setNotice(current=>current===message?'':current),6000);

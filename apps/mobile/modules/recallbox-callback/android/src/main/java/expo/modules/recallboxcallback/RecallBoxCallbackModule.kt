@@ -7,6 +7,11 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.activityresult.AppContextActivityResultLauncher
+import expo.modules.kotlin.functions.Coroutine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicReference
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -52,9 +57,29 @@ object CallbackStore {
 }
 
 class RecallBoxCallbackModule : Module() {
+  private lateinit var imagePicker: AppContextActivityResultLauncher<String, Uri?>
+  private val pendingImage = AtomicReference<Pair<String,Uri>?>(null)
   override fun definition() = ModuleDefinition {
     Name("RecallBoxCallback")
     AsyncFunction("consumeCallback") { appContext.reactContext?.let { CallbackStore.consume(it) } }
+    RegisterActivityContracts {
+      imagePicker=registerForActivityResult(ManualImageContract()) { owner, uri ->
+        if(uri!=null)pendingImage.set(owner to uri)
+      }
+    }
+    AsyncFunction("pickManualImage") Coroutine { owner: String ->
+      require(owner.isNotBlank())
+      pendingImage.set(null)
+      val uri=imagePicker.launch(owner)
+      pendingImage.set(null)
+      if(uri==null)return@Coroutine null
+      withContext(Dispatchers.IO) {ManualImagePicker.copy(requireNotNull(appContext.reactContext),uri)}
+    }
+    AsyncFunction("getPendingManualImage") Coroutine { owner: String ->
+      val pending=pendingImage.get()?.takeIf {it.first==owner} ?: return@Coroutine null
+      if(!pendingImage.compareAndSet(pending,null))return@Coroutine null
+      withContext(Dispatchers.IO) {ManualImagePicker.copy(requireNotNull(appContext.reactContext),pending.second)}
+    }
     Events("shareInboxChanged")
     val listener: () -> Unit = { sendEvent("shareInboxChanged", emptyMap<String, Any>()) }
     OnCreate { ShareStore.listeners.add(listener) }
