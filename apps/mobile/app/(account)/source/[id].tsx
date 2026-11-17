@@ -1,3 +1,4 @@
+import {SavedText} from '../../../src/saved-text';
 import {tokens} from '../../../src/theme';
 import {Icon, sourceIcon} from '../../../src/icons';
 import {useCallback, useEffect, useState} from 'react';
@@ -79,11 +80,9 @@ export default function SourceCoverage() {
         <Type muted>{coverage}</Type>
         {!!record.processing_error&&<Type muted variant="caption">{record.processing_error}</Type>}
       </View>
-      {!!text.trim()&&<View style={{gap: tokens.space.small}}>
-        <Type variant="section">Text we actually have</Type>
-        <Type>{text.slice(0,6000)}</Type>
-        {text.length>6000&&<Notice>This view shows an excerpt of available source text.</Notice>}
-      </View>}
+      {!!text.trim() && (record.kind === 'note' || record.processing_state === 'ready'
+        ? <SavedText text={text} note={record.kind === 'note'}/>
+        : <View style={{gap:tokens.space.small}}><Type variant="section">Saved metadata preview</Type><Type selectable>{text}</Type></View>)}
       <Type variant="eyebrow" muted>SOURCE DETAILS</Type>
       <View style={{backgroundColor:p.surface,padding: tokens.space.medium,borderRadius: tokens.radii.medium,borderWidth:1,
         borderColor:p.line,gap: tokens.space.small}}>
@@ -94,7 +93,7 @@ export default function SourceCoverage() {
       </View>
       {!!record.source_url&&<Button label="Open original source" onPress={()=>void openLink()}/>}
       {['pdf','image'].includes(record.kind)&&<Button label="Open or share the saved file"
-        variant="secondary" onPress={()=>router.replace({
+        variant="secondary" onPress={()=>router.canGoBack() ? router.back() : router.replace({
           pathname:'/(account)/memory/[id]',params:{id:record.id},
         })}/>}
       {record.processing_state==='metadata_only'&&<Notice>
