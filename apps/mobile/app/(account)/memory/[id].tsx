@@ -1,8 +1,8 @@
 import {tokens} from '../../../src/theme';
-import {Icon, sourceIcon} from '../../../src/icons';
+import {Icon} from '../../../src/icons';
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {AccessibilityInfo, Alert, Image, ImageURISource, Linking, Modal, Pressable, View} from 'react-native';
+import {ImageViewer} from '../../../src/image-viewer';
+import {AccessibilityInfo, Alert, Image, ImageURISource, Linking, Modal, Pressable, View, useWindowDimensions} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams, useNavigation, usePreventRemove} from 'expo-router';
 import {ApiError, Memory, memoriesApi, actionOptionsApi, ActionOption} from '../../../src/api';
 import {SavedText} from '../../../src/saved-text';
@@ -25,6 +25,13 @@ export default function MemoryDetail() {
   });
   const store = useMemories();
   const p = usePalette();
+  const window = useWindowDimensions();
+  const [imageAttempt, setImageAttempt] = useState(0);
+  const mounted = useRef(true);
+  const assetRequest = useRef<AbortController | null>(null);
+  useEffect(() => {mounted.current = true; return () => {mounted.current = false;assetRequest.current?.abort();};}, []);
+  const [imageRatio, setImageRatio] = useState<number | null>(null);
+  const [imageLoading, setImageLoading] = useState(true);
   const {authorized} = useSession();
   const [base, setBase] = useState<Memory | null>(null);
   const [title, setTitle] = useState('');
@@ -92,13 +99,13 @@ export default function MemoryDetail() {
   }, [id, base?.version, base?.processing_state]);
   useEffect(() => {
     let active=true;
-    setImageSource(null);setImageError(false);setViewingImage(false);
+    setImageSource(null);setImageRatio(null);setImageLoading(true);setImageError(false);setViewingImage(false);
     if(base?.kind==='image' && base.original_available !== false) {
-      void authorized(async token => ({uri:`${apiURL()}/v1/memories/${base.id}/asset`,headers:{Authorization:`Bearer ${token}`},cache:'force-cache' as const}))
+      void authorized(async token => ({uri:`${apiURL()}/v1/memories/${base.id}/asset`,headers:{Authorization:`Bearer ${token}`},cache:'reload' as const}))
         .then(source => {if(active) setImageSource(source);}).catch(() => {if(active) setImageError(true);});
     }
     return () => {active=false;};
-  }, [base?.id,base?.kind,base?.original_available]);
+  }, [base?.id,base?.kind,base?.original_available,imageAttempt]);
   useEffect(() => {
     if (!base || !['queued','processing'].includes(base.processing_state) || dirty || editing) return;
     // Quiet polling must not disable a reader's controls or flash a loader.
@@ -107,27 +114,40 @@ export default function MemoryDetail() {
   }, [base?.processing_state, dirty, editing, id]);
   async function original() {
     if(!base || busy) return;
+    if (base.original_available === false) {setError('The saved original file is unavailable.'); return;}
     setBusy(true); setError(''); setNotice('');
     let file: File | null = null;
     let mime = 'application/octet-stream';
+    let stage = 'download';
+    const controller = new AbortController();
+    assetRequest.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
+      if (!await Sharing.isAvailableAsync()) {setError('Native file sharing is unavailable on this device.'); return;}
       await authorized(async token => {
         // Fetch with the same authorization and account-generation guard as notes.
-        const response = await fetch(`${apiURL()}/v1/memories/${base.id}/asset`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});
+        const response = await fetch(`${apiURL()}/v1/memories/${base.id}/asset`,{headers:{Authorization:`Bearer ${token}`},signal:controller.signal});
         if(!response.ok) throw new ApiError(response.status,'asset_unavailable');
         mime = response.headers.get('content-type')?.split(';')[0] || mime;
-        const extension = ({'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg','image/webp':'webp'} as Record<string,string>)[mime] || 'bin';
-        file = new File(Paths.cache, `recallbox-${base.id}.${extension}`);
+        const extension = ({'application/pdf':'pdf','image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif','image/heic':'heic','image/avif':'avif'} as Record<string,string>)[mime] || 'bin';
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!mounted.current) return;
+        stage = 'cache';
+        file = new File(Paths.cache, `recallbox-${base.id}-${Date.now()}.${extension}`);
         if (file.exists) file.delete();
         file.create();
-        file.write(new Uint8Array(await response.arrayBuffer()));
+        file.write(bytes);
       });
-      if(file) await Sharing.shareAsync((file as File).uri, {mimeType:mime});
-    } catch(cause) {setError(cause instanceof ApiError && cause.status === 404
-      ? 'The saved original file is unavailable. Your memory and saved text are still here.' : errorMessage(cause));}
-    finally {try {if(file && (file as File).exists) (file as File).delete();}
-      catch {setError('Sharing finished, but the temporary cached copy could not be removed.');}
-      finally {setBusy(false);}}
+      clearTimeout(timeout);
+      stage = 'share';
+      if(file && mounted.current) await Sharing.shareAsync((file as File).uri, {mimeType:mime});
+    } catch(cause) {if (mounted.current) setError(cause instanceof ApiError && (cause.status === 404 || cause.status === 410)
+      ? 'The saved original file is unavailable. Your memory and saved text are still here.' : stage === 'cache' ? 'Could not prepare the private file for sharing. Check available device storage and try again.'
+      : stage === 'share' ? 'Could not open file sharing on this device. Please try again.' : errorMessage(cause));}
+    finally {clearTimeout(timeout);assetRequest.current = null;
+      try {if(file && (file as File).exists) (file as File).delete();}
+      catch {if (mounted.current) setError('Sharing finished, but the temporary cached copy could not be removed.');}
+      finally {if (mounted.current) setBusy(false);}}
   }
   async function retryProcessing() {
     setBusy(true);setError('');setNotice('');
@@ -187,19 +207,19 @@ export default function MemoryDetail() {
   const readerText = base?.kind === 'note' ? base.content : base?.processing_state === 'ready' ? base.extracted_text : '';
   const previewText = base?.processing_state === 'metadata_only' && isLink ? base.extracted_text : '';
   const origin = sourceURL?.replace(/^https?:\/\//i,'').split(/[/?#]/)[0] ||
-    (base?.kind === 'note' ? 'Your note' : base?.kind === 'pdf' ? 'Saved PDF' : base?.kind === 'image' ? 'Saved photo' : 'Saved source');
+    (base?.kind === 'note' ? 'Your note' : base?.kind === 'pdf' ? 'Saved PDF' : base?.kind === 'image' ? 'Saved image' : 'Saved source');
   return <Screen>
     <TextAction icon="back" label={backLabel} disabled={busy}
       onPress={() => router.canGoBack() ? router.back() : router.replace('/(account)')}/>
     {base && <View style={{gap: tokens.space.compact}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: tokens.space.medium}}>
         <SourcePlaceholder kind={base.kind}/>
-        <Type variant="secondary" style={{flex: 1}}>{origin} · Saved {new Date(base.created_at).toLocaleDateString(undefined,
+        <Type variant="secondary" style={{flex: 1}}>{origin} · {new Date(base.created_at).toDateString() === new Date().toDateString() ? 'Today' : new Date(base.created_at).toLocaleDateString(undefined,
           {day:'numeric',month:'short',year:'numeric'})}</Type>
       </View>
-      <Type variant="heading">{base.title.trim() || (base.kind === 'note' ? 'Untitled note' :
-        base.kind === 'image' ? 'Saved photo' : base.kind === 'pdf' ? 'Saved PDF' : 'Saved link')}</Type>
-      {!!topic && <View style={{alignSelf: 'flex-start', backgroundColor:p.surfaceMuted, borderRadius:tokens.radii.full, paddingHorizontal:tokens.space.compact}}><TextAction label={topic} disabled={busy || dirty}
+      <Type variant={base.kind === 'image' ? 'hero' : 'heading'}>{base.title.trim() || (base.kind === 'note' ? 'Untitled note' :
+        base.kind === 'image' ? 'Saved image' : base.kind === 'pdf' ? 'Saved PDF' : 'Saved link')}</Type>
+      {!!topic && base.kind !== 'image' && <View style={{alignSelf: 'flex-start', backgroundColor:p.surfaceMuted, borderRadius:tokens.radii.full, paddingHorizontal:tokens.space.compact}}><TextAction label={topic} disabled={busy || dirty}
         onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/></View>}
     </View>}
     {!base && <Type title>{unavailable ? 'Memory unavailable.' : 'Opening your memory…'}</Type>}
@@ -207,6 +227,7 @@ export default function MemoryDetail() {
     {!!error && <Notice kind="error">{error}</Notice>}
     {!base && !loading && !busy && !unavailable && <Button label="Try again" onPress={() => void load()}/>}
     {base && <>
+      {isLink && sourceURL && <Type selectable variant="secondary">{sourceURL}</Type>}
       {hasSource && base.kind !== 'note' && <Button label="Open original" disabled={busy}
         leading={<Icon name="link" color={p.onAccent}/>}
         onPress={() => {if (base.source_url) void Linking.openURL(base.source_url)
@@ -214,26 +235,47 @@ export default function MemoryDetail() {
           else void openOriginal();}}/>}
       {base.kind === 'note' && <Button label="Edit note" disabled={busy || editing} leading={<Icon name="note" color={p.onAccent}/>}
         onPress={() => setEditing(true)}/>}
-      {['image','pdf'].includes(base.kind) && <Button
-        label={base.kind === 'pdf' ? 'Open or share PDF' : imageSource && !imageError ? 'View saved image' : 'Open or share original image'}
+      {base.kind === 'image' && imageSource && !imageError && <Pressable
+        accessibilityRole="button" accessibilityLabel={`Expand image: ${base.title || 'Saved image'}`}
+        accessibilityHint="Opens full screen. Pinch to zoom and drag to pan."
+        accessibilityState={{disabled:imageLoading}} disabled={imageLoading} onPress={() => setViewingImage(true)} style={({pressed}) => ({opacity:pressed ? 0.78 : 1,
+          borderRadius:tokens.radii.button, overflow:'hidden'})}>
+        <Image source={imageSource} accessibilityLabel={base.title || 'Saved image'}
+          resizeMode="contain" resizeMethod="resize"
+          style={{width:'100%', aspectRatio:imageRatio || 1, maxHeight:window.height * 0.6}}
+          onLoad={event => {const {width,height} = event.nativeEvent.source;
+            if (width > 0 && height > 0) setImageRatio(width / height); setImageLoading(false);}}
+          onError={() => {setImageError(true);setImageLoading(false);}}/>
+        <View pointerEvents="none" style={{position:'absolute', bottom:tokens.space.small, right:tokens.space.small,
+          backgroundColor:p.scrim, borderRadius:tokens.radii.medium, minWidth:tokens.touch, minHeight:tokens.touch,
+          alignItems:'center',justifyContent:'center'}}><Icon name="expand" color={p.mediaForeground}/></View>
+      </Pressable>}
+      {base.kind === 'image' && imageLoading && !imageError && base.original_available !== false && <Notice>Loading saved image…</Notice>}
+      {imageError && <View style={{gap:tokens.space.small}}>
+        <Notice kind="error">The image preview could not be loaded. Check your connection or try sharing the saved original.</Notice>
+        <Button variant="secondary" label="Retry preview" onPress={() => {setImageAttempt(value => value + 1);}}/>
+      </View>}
+      {['image','pdf'].includes(base.kind) && <Button variant={base.kind === 'image' ? 'quiet' : 'primary'}
+        label={base.kind === 'pdf' ? 'Open or share PDF' : 'Share original'}
         busy={busy} disabled={base.original_available === false}
-        leading={<Icon name={sourceIcon(base.kind)} color={p.onAccent}/>}
-        onPress={() => base.kind === 'image' && imageSource && !imageError ? setViewingImage(true) : void original()}/>}
+        labelStyle={base.kind === 'image' ? {color:p.accent} : undefined}
+        leading={<Icon name={base.kind === 'image' ? 'share' : 'pdf'} color={base.kind === 'image' ? p.accent : p.onAccent}/>}
+        onPress={() => void original()}/>}
       <View style={{flexDirection:'row',flexWrap:'wrap',gap: tokens.space.small}}>
         <Button variant="secondary" size="compact" label={base.starred ? 'Starred' : 'Star'}
-          style={{flexGrow:1, paddingHorizontal:tokens.space.compact, backgroundColor:'transparent'}}
+          style={{flexGrow:1, paddingHorizontal:tokens.space.compact, borderRadius:tokens.radii.full, backgroundColor:'transparent'}}
           leading={<Icon name="star" filled={base.starred} color={base.starred ? p.favorite : p.primaryText}/>}
           disabled={busy || unavailable || Boolean(conflict) || dirty}
           onPress={() => void update({starred: !base.starred})}/>
         <Button variant="secondary" size="compact" label="Organize"
-          style={{flexGrow:1, paddingHorizontal:tokens.space.compact, backgroundColor:'transparent'}}
+          style={{flexGrow:1, paddingHorizontal:tokens.space.compact, borderRadius:tokens.radii.full, backgroundColor:'transparent'}}
           leading={<Icon name="collections"/>} disabled={busy || unavailable || Boolean(conflict) || dirty}
           onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/>
         <Button variant="secondary" size="compact" label="More" leading={<Icon name="more"/>}
-          style={{flexGrow:1, paddingHorizontal:tokens.space.compact, backgroundColor:'transparent'}}
+          style={{flexGrow:1, paddingHorizontal:tokens.space.compact, borderRadius:tokens.radii.full, backgroundColor:'transparent'}}
           disabled={busy} onPress={() => setShowMoreActions(true)}/>
       </View>
-      <Divider/>
+      {(base.kind !== 'image' || editing || !!readerText.trim()) && <Divider/>}
       {editing && <View style={{gap: tokens.space.medium}}>
         <Type variant="section">Edit memory</Type>
         <Input label="Title" value={title} onChangeText={setTitle} maxLength={240} editable={!busy}/>
@@ -275,53 +317,30 @@ export default function MemoryDetail() {
           } else setEditing(false);
         }}/>
       </View>}
-      {isPending && <Notice>
+      {isPending && base.kind !== 'image' && <Notice>
         Your original is saved in Library. Source details are still being processed.
       </Notice>}
-      {base.processing_state === 'failed' && <Notice kind="error">
+      {base.processing_state === 'failed' && base.kind !== 'image' && <Notice kind="error">
         Source details could not be processed. The saved original remains accessible when available. Retry is available in More.
       </Notice>}
       {base.original_available === false && <View style={{gap: tokens.space.small}}>
         <Notice kind="error">The original file is unavailable on the server. Save another copy if you still have it.</Notice>
         <Button variant="secondary" label="Save another copy" onPress={() => router.push('/(account)/save')}/>
       </View>}
-      {base.kind === 'image' && imageSource && !imageError && <>
-        <Pressable accessibilityRole="button" accessibilityLabel="View saved photo full screen"
-          onPress={() => setViewingImage(true)} style={({pressed}) => ({
-            opacity:pressed ? 0.78 : 1,borderRadius: tokens.radii.button,overflow:'hidden',
-          })}>
-          <Image accessibilityLabel="Saved photo preview" source={imageSource}
-            resizeMode="contain" style={{width:'100%',height:280,borderRadius: tokens.radii.button}}
-            onError={() => setImageError(true)}/>
-        </Pressable>
-      </>}
-      {imageError && <Notice>Preview unavailable. You can still open the saved original.</Notice>}
-      <Modal visible={viewingImage && !!imageSource && !imageError} transparent
-        animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={() => setViewingImage(false)}>
-        <SafeAreaView style={{flex:1,backgroundColor:p.mediaBackground,justifyContent:'center',
-          paddingHorizontal: tokens.space.compact,paddingTop: tokens.space.loose,paddingBottom: tokens.space.large}}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close full-screen photo"
-            onPress={() => setViewingImage(false)} style={{alignSelf:'flex-end',padding: tokens.space.medium,
-              minWidth:tokens.touch,minHeight: tokens.touch,alignItems:'center',justifyContent:'center'}}>
-            <Icon name="close" color={p.mediaForeground}/>
-          </Pressable>
-          {!!imageSource && <Image accessibilityLabel="Full-screen saved photo"
-            source={imageSource} resizeMode="contain" style={{width:'100%',flex:1}}
-            onError={() => {setImageError(true);setViewingImage(false);}}/>}
-        </SafeAreaView>
-      </Modal>
+      {viewingImage && imageSource && !imageError && <ImageViewer source={imageSource}
+        label={base.title || 'Saved image'} ratio={imageRatio || 1} reducedMotion={reducedMotion}
+        onClose={() => setViewingImage(false)} onError={() => {setImageError(true);setViewingImage(false);}}/>}
       {base.kind === 'pdf' && <Notice>
         This PDF is saved privately. Open it in a compatible app to read or share the original.
       </Notice>}
       {base.kind === 'note' && !editing && !readerText.trim() && <Notice>This note has no text.</Notice>}
       {!!readerText.trim() && !(editing && base.kind === 'note') && <SavedText key={base.id} text={readerText} note={base.kind === 'note'}/>}
-      {!readerText.trim() && base.processing_state === 'ready' && base.kind !== 'note' && <Notice>No extracted text is available for this save.</Notice>}
+      {!readerText.trim() && base.processing_state === 'ready' && base.kind !== 'note' && base.kind !== 'image' && <Notice>No extracted text is available for this save.</Notice>}
       {!!previewText.trim() && <View style={{gap:tokens.space.small}}>
         <Type variant="section">Saved page preview</Type><Type selectable>{previewText}</Type>
       </View>}
-      {base.kind !== 'note' && !isPending && base.processing_state !== 'ready' && <Notice>
-        {base.kind === 'image' ? 'Image text recognition is unavailable for this save.' :
-          'Complete source text was not obtained. Any saved page preview is metadata, not a transcript or full article.'}
+      {base.kind !== 'note' && base.kind !== 'image' && !isPending && base.processing_state !== 'ready' && <Notice>
+        {'Complete source text was not obtained. Any saved page preview is metadata, not a transcript or full article.'}
       </Notice>}
       {remote && remote.version > base.version && <>
         <Notice>This memory changed on another device. Your draft remains here.</Notice>
@@ -344,7 +363,7 @@ export default function MemoryDetail() {
               onPress={() => {setShowMoreActions(false);setEditing(true);}}/>
             <TextAction icon="collections" label="Add to collection" disabled={busy || dirty || unavailable}
               onPress={() => {setShowMoreActions(false);router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}});}}/>
-            <TextAction icon="pdf" label="View source coverage" disabled={busy || dirty}
+            <TextAction icon="pdf" label="Source details" disabled={busy || dirty}
               onPress={() => {setShowMoreActions(false);router.push({pathname:'/(account)/source/[id]',params:{id}});}}/>
             {['image','pdf'].includes(base.kind) && <TextAction icon="upload" label="Share original file"
               disabled={busy || base.original_available === false} onPress={() => {setShowMoreActions(false);void original();}}/>}

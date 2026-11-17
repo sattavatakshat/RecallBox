@@ -4,7 +4,7 @@ import {Icon, sourceIcon} from '../../../src/icons';
 import {useCallback, useEffect, useState} from 'react';
 import {Image, Linking, View} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams} from 'expo-router';
-import {Memory} from '../../../src/api';
+import {Memory, memoriesApi} from '../../../src/api';
 import {apiURL} from '../../../src/config';
 import {useMemories} from '../../../src/memories';
 import {useSession} from '../../../src/session';
@@ -31,18 +31,19 @@ export default function SourceCoverage() {
   useFocusEffect(useCallback(()=>{if(!record)void load();},[record,load]));
   useEffect(()=>{
     let active=true;
-    if(record?.kind==='image'){
+    setImageSource(null);setImageError(false);
+    if(record?.kind==='image' && record.original_available !== false){
       void authorized(async token=>({
         uri:`${apiURL()}/v1/memories/${record.id}/asset`,
-        headers:{Authorization:`Bearer ${token}`},
+        headers:{Authorization:`Bearer ${token}`}, cache:'reload' as const,
       })).then(source=>{if(active)setImageSource(source);})
         .catch(()=>{if(active)setImageError(true);});
     }
     return ()=>{active=false;};
-  },[record?.id,record?.kind]);
+  },[record?.id,record?.kind,record?.original_available]);
 
   const coverage=record?.kind==='note'?'Your own note is preserved as written.'
-    :record?.processing_state==='ready'?'Available source text was extracted.'
+    :record?.processing_state==='ready'?record.extracted_text.trim() ? 'Available source text was extracted.' : 'Processing completed without extracted text.'
     :record?.processing_state==='metadata_only'
       ?'Only the original file/link and available metadata were saved. The full contents were not extracted.'
     :record?.processing_state==='failed'?'Source details could not be extracted.'
@@ -56,7 +57,7 @@ export default function SourceCoverage() {
   }
   return <Screen compact>
     <TextAction icon="back" label="Memory" onPress={()=>router.back()}/>
-    <Type title>Real content, not guesses.</Type>
+    <Type title>Source details</Type>
     <Type muted>Different sources provide different levels of evidence. RecallBox never fills gaps with invented details.</Type>
     {!!error&&<Notice kind="error">{error}</Notice>}
     {loading&&<Notice>Loading saved source details…</Notice>}
@@ -89,6 +90,7 @@ export default function SourceCoverage() {
         <Type muted variant="caption">Type: {record.kind.toUpperCase()}</Type>
         <Type muted variant="caption">Saved: {new Date(record.created_at).toLocaleDateString()}</Type>
         {!!record.source_url&&<Type muted variant="caption" numberOfLines={3}>{record.source_url}</Type>}
+        <Type muted variant="caption">Original: {record.original_available === false ? 'Unavailable' : ['image','pdf'].includes(record.kind) ? 'Saved on the server; retrieval requires a connection' : 'Saved note or source link'}</Type>
         <Type muted variant="caption">Processing: {record.processing_state.replace('_',' ')}</Type>
       </View>
       {!!record.source_url&&<Button label="Open original source" onPress={()=>void openLink()}/>}
@@ -96,7 +98,11 @@ export default function SourceCoverage() {
         variant="secondary" onPress={()=>router.canGoBack() ? router.back() : router.replace({
           pathname:'/(account)/memory/[id]',params:{id:record.id},
         })}/>}
-      {record.processing_state==='metadata_only'&&<Notice>
+      {record.processing_state === 'failed' && <Button label="Retry getting details" disabled={loading}
+        onPress={() => {setLoading(true);setError('');void authorized(token => memoriesApi.retry(token,id))
+          .then(setRecord).catch(() => setError('Could not retry processing. Check your connection and try again.'))
+          .finally(() => setLoading(false));}}/>}
+      {record.processing_state==='metadata_only' && ['url','link'].includes(record.kind) && <Notice>
         A restricted reel or social page may be a finished link-only save. That does not mean its video was analyzed.
       </Notice>}
     </>}
