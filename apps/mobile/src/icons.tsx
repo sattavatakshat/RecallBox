@@ -1,5 +1,7 @@
 
 import {View, type StyleProp, type ViewStyle} from 'react-native';
+import ShoppingBasket from 'lucide-react-native/icons/shopping-basket';
+import MapPin from 'lucide-react-native/icons/map-pin';
 import Maximize from 'lucide-react-native/icons/maximize';
 import Share from 'lucide-react-native/icons/share';
 import Library from 'lucide-react-native/icons/library';
@@ -33,7 +35,7 @@ import Clock from 'lucide-react-native/icons/clock';
 import CloudUpload from 'lucide-react-native/icons/cloud-upload';
 import {tokens, usePalette} from './theme';
 
-const icons = {expand: Maximize, share: Share, library: Library, search: Search, collections: Layers, save: Plus, account: UserRound,
+const icons = {shopping: ShoppingBasket, travel: MapPin, expand: Maximize, share: Share, library: Library, search: Search, collections: Layers, save: Plus, account: UserRound,
   link: Link, note: NotebookPen, image: Image, pdf: FileText, star: Star, back: ArrowLeft,
   close: X, more: MoreHorizontal, filter: SlidersHorizontal, check: Check, warning: TriangleAlert,
   retry: RotateCcw, upload: Upload, chevron: ChevronRight, down: ChevronDown,

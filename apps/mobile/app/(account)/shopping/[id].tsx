@@ -78,10 +78,11 @@ export default function ShoppingChecklist() {
   }
   return <Screen compact>
     <TextAction icon="back" label="Memory" onPress={()=> {
-      if(saved?.source_memory_id)router.replace({
+      if(router.canGoBack())router.back();
+      else if(saved?.source_memory_id)router.replace({
         pathname:'/(account)/memory/[id]',params:{id:saved.source_memory_id},
       });
-      else router.back();
+      else router.replace('/(account)');
     }}/>
     <Type variant="eyebrow" muted>FROM A VERIFIED RECIPE</Type>
     <Type title>Shopping list.</Type>
@@ -115,7 +116,7 @@ export default function ShoppingChecklist() {
           </View>
         </View>
         <Type muted variant="caption">{item.origin==='source'
-          ? 'From saved source: '+item.source_quote
+          ? (item.text !== item.source_quote ? 'Edited by you. Original source: ' : 'From saved source: ')+item.source_quote
           : 'Added by you'}</Type>
         <TextAction label="Remove ingredient" disabled={busy}
           onPress={()=>setItems(current=>current.filter(row=>row.id!==item.id))}/>

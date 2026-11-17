@@ -4,7 +4,8 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {ImageViewer} from '../../../src/image-viewer';
 import {AccessibilityInfo, Alert, Image, ImageURISource, Linking, Modal, Pressable, View, useWindowDimensions} from 'react-native';
 import {router, useFocusEffect, useLocalSearchParams, useNavigation, usePreventRemove} from 'expo-router';
-import {ApiError, Memory, memoriesApi, actionOptionsApi, ActionOption} from '../../../src/api';
+import {ApiError, Memory, memoriesApi} from '../../../src/api';
+import {ContextualActionCard} from '../../../src/contextual-action-card';
 import {SavedText} from '../../../src/saved-text';
 import {apiURL} from '../../../src/config';
 import {useSession} from '../../../src/session';
@@ -14,6 +15,11 @@ import {errorMessage, useMemories} from '../../../src/memories';
 import {Button, Divider, IconButton, Input, Notice, Screen, SheetSurface, SourcePlaceholder, TextAction, Type, usePalette} from '../../../src/ui';
 
 export default function MemoryDetail() {
+  const {account} = useSession();
+  const {id} = useLocalSearchParams<{id: string}>();
+  return <MemoryReader key={`${account?.id}:${id}`}/>;
+}
+function MemoryReader() {
   const {id, saved} = useLocalSearchParams<{id: string; saved?: string}>();
   const navigation = useNavigation();
   // Capture the real preceding route once; subordinate screens must not change this label.
@@ -47,7 +53,7 @@ export default function MemoryDetail() {
   const [viewingImage, setViewingImage] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [options, setOptions] = useState<ActionOption[]>([]);
+  const [contextBusy, setContextBusy] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -60,9 +66,9 @@ export default function MemoryDetail() {
   const opening = useRef(false);
   const dirty = Boolean(base && (title !== base.title || content !== base.content || collection !== base.collection));
   const draftGuard = useRef(false);
-  draftGuard.current = dirty || editing || busy;
-  const release = usePreventRemove((dirty || busy) && !leaving, ({repeat}) => {
-    if (busy) { Alert.alert('Saving changes', 'Wait for the request to finish.'); return; }
+  draftGuard.current = dirty || editing || busy || contextBusy;
+  const release = usePreventRemove((dirty || busy || contextBusy) && !leaving, ({repeat}) => {
+    if (busy || contextBusy) { Alert.alert('Saving changes', 'Wait for the request to finish.'); return; }
     Alert.alert('Leave your draft?', 'Your unsaved edits will be discarded.', [
       {text: 'Keep editing', style: 'cancel'},
       {text: 'Discard edits', style: 'destructive', onPress: () => { setLeaving(true); release(); repeat(); }},
@@ -88,15 +94,6 @@ export default function MemoryDetail() {
     finally { opening.current = false; setLoading(false); if (!background) setBusy(false); }
   }
   useFocusEffect(useCallback(() => { void load(true); }, [id, store.get]));
-  useEffect(() => {
-    let active = true;
-    setOptions([]);
-    if (base?.processing_state === 'ready') {
-      void authorized(token => actionOptionsApi.forMemory(token, id))
-        .then(result => {if (active) setOptions(result.items);}).catch(() => {});
-    }
-    return () => {active = false;};
-  }, [id, base?.version, base?.processing_state]);
   useEffect(() => {
     let active=true;
     setImageSource(null);setImageRatio(null);setImageLoading(true);setImageError(false);setViewingImage(false);
@@ -209,7 +206,7 @@ export default function MemoryDetail() {
   const origin = sourceURL?.replace(/^https?:\/\//i,'').split(/[/?#]/)[0] ||
     (base?.kind === 'note' ? 'Your note' : base?.kind === 'pdf' ? 'Saved PDF' : base?.kind === 'image' ? 'Saved image' : 'Saved source');
   return <Screen>
-    <TextAction icon="back" label={backLabel} disabled={busy}
+    <TextAction icon="back" label={backLabel} disabled={busy || contextBusy}
       onPress={() => router.canGoBack() ? router.back() : router.replace('/(account)')}/>
     {base && <View style={{gap: tokens.space.compact}}>
       <View style={{flexDirection: 'row', alignItems: 'center', gap: tokens.space.medium}}>
@@ -219,7 +216,7 @@ export default function MemoryDetail() {
       </View>
       <Type variant={base.kind === 'image' ? 'hero' : 'heading'}>{base.title.trim() || (base.kind === 'note' ? 'Untitled note' :
         base.kind === 'image' ? 'Saved image' : base.kind === 'pdf' ? 'Saved PDF' : 'Saved link')}</Type>
-      {!!topic && base.kind !== 'image' && <View style={{alignSelf: 'flex-start', backgroundColor:p.surfaceMuted, borderRadius:tokens.radii.full, paddingHorizontal:tokens.space.compact}}><TextAction label={topic} disabled={busy || dirty}
+      {!!topic && base.kind !== 'image' && <View style={{alignSelf: 'flex-start', backgroundColor:p.surfaceMuted, borderRadius:tokens.radii.full, paddingHorizontal:tokens.space.compact}}><TextAction label={topic} disabled={busy || contextBusy || dirty}
         onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/></View>}
     </View>}
     {!base && <Type title>{unavailable ? 'Memory unavailable.' : 'Opening your memory…'}</Type>}
@@ -228,12 +225,12 @@ export default function MemoryDetail() {
     {!base && !loading && !busy && !unavailable && <Button label="Try again" onPress={() => void load()}/>}
     {base && <>
       {isLink && sourceURL && <Type selectable variant="secondary">{sourceURL}</Type>}
-      {hasSource && base.kind !== 'note' && <Button label="Open original" disabled={busy}
+      {hasSource && base.kind !== 'note' && <Button label="Open original" disabled={busy || contextBusy}
         leading={<Icon name="link" color={p.onAccent}/>}
         onPress={() => {if (base.source_url) void Linking.openURL(base.source_url)
           .catch(() => setError('Could not open the external site on this device. Your saved memory is still here.'));
           else void openOriginal();}}/>}
-      {base.kind === 'note' && <Button label="Edit note" disabled={busy || editing} leading={<Icon name="note" color={p.onAccent}/>}
+      {base.kind === 'note' && <Button label="Edit note" disabled={busy || contextBusy || editing} leading={<Icon name="note" color={p.onAccent}/>}
         onPress={() => setEditing(true)}/>}
       {base.kind === 'image' && imageSource && !imageError && <Pressable
         accessibilityRole="button" accessibilityLabel={`Expand image: ${base.title || 'Saved image'}`}
@@ -265,15 +262,15 @@ export default function MemoryDetail() {
         <Button variant="secondary" size="compact" label={base.starred ? 'Starred' : 'Star'}
           style={{flexGrow:1, paddingHorizontal:tokens.space.compact, borderRadius:tokens.radii.full, backgroundColor:'transparent'}}
           leading={<Icon name="star" filled={base.starred} color={base.starred ? p.favorite : p.primaryText}/>}
-          disabled={busy || unavailable || Boolean(conflict) || dirty}
+          disabled={busy || contextBusy || unavailable || Boolean(conflict) || dirty}
           onPress={() => void update({starred: !base.starred})}/>
         <Button variant="secondary" size="compact" label="Organize"
           style={{flexGrow:1, paddingHorizontal:tokens.space.compact, borderRadius:tokens.radii.full, backgroundColor:'transparent'}}
-          leading={<Icon name="collections"/>} disabled={busy || unavailable || Boolean(conflict) || dirty}
+          leading={<Icon name="collections"/>} disabled={busy || contextBusy || unavailable || Boolean(conflict) || dirty}
           onPress={() => router.push({pathname:'/(account)/organize',params:{id}})}/>
         <Button variant="secondary" size="compact" label="More" leading={<Icon name="more"/>}
           style={{flexGrow:1, paddingHorizontal:tokens.space.compact, borderRadius:tokens.radii.full, backgroundColor:'transparent'}}
-          disabled={busy} onPress={() => setShowMoreActions(true)}/>
+          disabled={busy || contextBusy} onPress={() => setShowMoreActions(true)}/>
       </View>
       {(base.kind !== 'image' || editing || !!readerText.trim()) && <Divider/>}
       {editing && <View style={{gap: tokens.space.medium}}>
@@ -293,9 +290,9 @@ export default function MemoryDetail() {
           <Type selectable>Latest content: {conflict.content}</Type>
           <Type muted>Latest collection: {conflict.collection || 'None'}</Type>
           <Notice>Your draft remains above. Review before saving.</Notice>
-          <Button variant="secondary" label="Use newer version as my base" disabled={busy}
+          <Button variant="secondary" label="Use newer version as my base" disabled={busy || contextBusy}
             onPress={() => {setBase(conflict);setConflict(null);setError('');}}/>
-          <TextAction label="Discard draft and load latest" disabled={busy} onPress={() =>
+          <TextAction label="Discard draft and load latest" disabled={busy || contextBusy} onPress={() =>
             Alert.alert('Discard your draft?', 'Your unsaved changes will be lost.', [
               {text:'Keep draft',style:'cancel'},
               {text:'Use latest',onPress:()=>{setBase(conflict);setTitle(conflict.title);
@@ -307,7 +304,7 @@ export default function MemoryDetail() {
             ((base.kind === 'note' || base.kind === 'link' || base.kind === 'url') && !content.trim())}
           onPress={() => void update(base.kind === 'note' || base.kind === 'link' || base.kind === 'url'
             ? {title, content, collection} : {title, collection})}/>
-        <TextAction label="Cancel editing" disabled={busy} onPress={() => {
+        <TextAction label="Cancel editing" disabled={busy || contextBusy} onPress={() => {
           if (dirty) {
             Alert.alert('Discard changes?', 'Your unsaved edits will be lost.',[
               {text:'Keep editing',style:'cancel'},
@@ -344,13 +341,10 @@ export default function MemoryDetail() {
       </Notice>}
       {remote && remote.version > base.version && <>
         <Notice>This memory changed on another device. Your draft remains here.</Notice>
-        <TextAction label="Compare with latest" disabled={busy} onPress={() => void compare()}/>
+        <TextAction label="Compare with latest" disabled={busy || contextBusy} onPress={() => void compare()}/>
       </>}
-      {!!options.length && <View style={{gap:tokens.space.small}}>
-        <Type variant="section">Useful next steps</Type>
-        <TextAction label={options.map(option => option.label).join(' · ')} disabled={busy || unavailable || dirty}
-          onPress={() => router.push({pathname:'/(account)/next-steps',params:{memoryId:id}})}/>
-      </View>}
+      <ContextualActionCard memory={base} disabled={busy || contextBusy || dirty || editing || unavailable || Boolean(conflict)}
+        onBusyChange={setContextBusy} onRefreshMemory={() => void load(true)}/>
       {unavailable && <Notice>This memory is unavailable. Your draft has not been discarded.</Notice>}
       <Modal visible={showMoreActions} transparent animationType={reducedMotion ? 'none' : 'slide'} onRequestClose={() => setShowMoreActions(false)}>
         <View style={{flex:1,justifyContent:'flex-end',backgroundColor:p.scrim}}>
@@ -359,22 +353,22 @@ export default function MemoryDetail() {
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
               <Type variant="section">Memory actions</Type><IconButton icon="close" label="Close memory actions" onPress={() => setShowMoreActions(false)}/>
             </View>
-            <TextAction icon="note" label="Edit title and details" disabled={busy || unavailable || editing}
+            <TextAction icon="note" label="Edit title and details" disabled={busy || contextBusy || unavailable || editing}
               onPress={() => {setShowMoreActions(false);setEditing(true);}}/>
-            <TextAction icon="collections" label="Add to collection" disabled={busy || dirty || unavailable}
+            <TextAction icon="collections" label="Add to collection" disabled={busy || contextBusy || dirty || unavailable}
               onPress={() => {setShowMoreActions(false);router.push({pathname:'/(account)/add-to-collection',params:{memoryId:id}});}}/>
-            <TextAction icon="pdf" label="Source details" disabled={busy || dirty}
+            <TextAction icon="pdf" label="Source details" disabled={busy || contextBusy || dirty}
               onPress={() => {setShowMoreActions(false);router.push({pathname:'/(account)/source/[id]',params:{id}});}}/>
             {['image','pdf'].includes(base.kind) && <TextAction icon="upload" label="Share original file"
-              disabled={busy || base.original_available === false} onPress={() => {setShowMoreActions(false);void original();}}/>}
-            {base.processing_state === 'failed' && <TextAction icon="retry" label="Retry getting details" disabled={busy || dirty}
+              disabled={busy || contextBusy || base.original_available === false} onPress={() => {setShowMoreActions(false);void original();}}/>}
+            {base.processing_state === 'failed' && <TextAction icon="retry" label="Retry getting details" disabled={busy || contextBusy || dirty}
               onPress={() => {setShowMoreActions(false);void retryProcessing();}}/>}
-            <TextAction icon="clock" label="Set a reminder" disabled={busy || dirty || unavailable}
+            <TextAction icon="clock" label="Set a reminder" disabled={busy || contextBusy || dirty || unavailable}
               onPress={() => {setShowMoreActions(false);router.push({pathname:'/(account)/reminder',params:{memoryId:id}});}}/>
             <TextAction label={base.archived ? 'Restore from archive' : 'Archive memory'}
-              disabled={busy || unavailable || Boolean(conflict) || dirty}
+              disabled={busy || contextBusy || unavailable || Boolean(conflict) || dirty}
               onPress={() => {setShowMoreActions(false);void update({archived: !base.archived});}}/>
-            <TextAction label="Delete memory" disabled={busy || unavailable || dirty}
+            <TextAction label="Delete memory" disabled={busy || contextBusy || unavailable || dirty}
               onPress={() => {setShowMoreActions(false);confirmDelete();}}/>
           </Screen></SheetSurface>
         </View>

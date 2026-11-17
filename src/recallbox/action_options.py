@@ -73,9 +73,9 @@ async def memory_action_options(memory_id: UUID, request: Request,
                                 who=Depends(principal)):
     owner = who[0]
     async with owned(request.app.state.pool, owner, readonly=True) as conn:
-        row = await conn.fetchrow('''SELECT kind,user_note,extracted_text,processing_state,
+        row = await conn.fetchrow('''SELECT version,kind,user_note,extracted_text,processing_state,
             suggested_topic,suggested_topic_reason FROM memories
             WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL''', memory_id, owner)
         if row is None:
             raise Problem(404,'memory_not_found')
-    return {'items':eligible_actions(row)}
+    return {'items':eligible_actions(row), 'source_version':row['version']}

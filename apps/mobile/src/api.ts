@@ -110,7 +110,7 @@ export const collectionsApi = {
 
 export type ActionOption = {kind:'shopping'|'trip'|'learning';label:string;reason:string;evidence_lines:string[]};
 export const actionOptionsApi = {
-  forMemory: (access:string,id:string) => request<{items:ActionOption[]}>(
+  forMemory: (access:string,id:string) => request<{items:ActionOption[]; source_version?: number}>(
     `/memories/${encodeURIComponent(id)}/action-options`,'GET',undefined,access),
 };
 export type ShoppingItem = {id:string;text:string;checked:boolean;
@@ -118,9 +118,12 @@ export type ShoppingItem = {id:string;text:string;checked:boolean;
 export type ShoppingList = {id:string;source_memory_id:string;title:string;
   source_title:string;source_url:string|null;items:ShoppingItem[];version:number;
   created_at:string;updated_at:string};
+export type ShoppingDraft = {expected_source_version: number; title: string; items: ShoppingItem[]};
 export const shoppingApi = {
-  create:(access:string,memoryId:string)=>request<ShoppingList>(
-    `/memories/${encodeURIComponent(memoryId)}/shopping-list`,'POST',undefined,access),
+  forSource:(access:string,memoryId:string)=>request<{item:ShoppingList|null}>(
+    `/memories/${encodeURIComponent(memoryId)}/shopping-list`,'GET',undefined,access),
+  create:(access:string,memoryId:string,body?:ShoppingDraft)=>request<ShoppingList>(
+    `/memories/${encodeURIComponent(memoryId)}/shopping-list`,'POST',body,access),
   get:(access:string,id:string)=>request<ShoppingList>(
     `/shopping-lists/${encodeURIComponent(id)}`,'GET',undefined,access),
   edit:(access:string,id:string,body:{expected_version:number;

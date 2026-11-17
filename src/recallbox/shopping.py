@@ -55,6 +55,38 @@ class ShoppingEdit(BaseModel):
         return self
 
 
+class ShoppingCreate(BaseModel):
+    """Confirmed local draft; source quotations are checked against current evidence."""
+    model_config = ConfigDict(extra='forbid', strict=True)
+    expected_source_version: int = Field(ge=1, le=2147483646)
+    title: str = Field(min_length=1, max_length=160)
+    items: list[ShoppingItem] = Field(min_length=1, max_length=60)
+
+    @model_validator(mode='after')
+    def validate_draft(self):
+        if not self.title.strip():
+            raise ValueError('Title cannot be blank')
+        if len({item.id for item in self.items}) != len(self.items):
+            raise ValueError('Duplicate item identifiers')
+        return self
+
+
+def draft_items(body, source):
+    if source['version'] != body.expected_source_version:
+        raise Problem(409, 'shopping_source_version_conflict')
+    recipe = next((item for item in eligible_actions(source) if item['kind']=='shopping'), None)
+    if recipe is None:
+        raise Problem(422, 'insufficient_recipe_evidence')
+    quotes = set(recipe['evidence_lines'])
+    items = [item.model_dump(mode='json') for item in body.items]
+    for item in items:
+        if item['origin']=='source' and item['source_quote'] not in quotes:
+            raise Problem(422, 'unverified_ingredient')
+    if len(json.dumps(items, ensure_ascii=False).encode('utf-8')) > 40000:
+        raise Problem(422, 'shopping_items_too_large')
+    return items
+
+
 def decoded(row):
     result = {key:row[key] for key in
               ('id','source_memory_id','title','items','version','created_at','updated_at')}
@@ -84,33 +116,50 @@ async def get_list(list_id: UUID, request: Request, who=Depends(principal)):
         return decoded(await find(conn,who[0],list_id))
 
 
-@router.post('/memories/{memory_id}/shopping-list',status_code=201)
-async def create_list(memory_id: UUID, request: Request, who=Depends(principal)):
+@router.get('/memories/{memory_id}/shopping-list')
+async def list_for_source(memory_id: UUID, request: Request, who=Depends(principal)):
+    """Lookup only; never creates a list or changes the source."""
+    owner = who[0]
+    async with owned(request.app.state.pool, owner, readonly=True) as conn:
+        source = await conn.fetchval('''SELECT id FROM memories
+            WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL''', memory_id, owner)
+        if source is None:
+            raise Problem(404, 'memory_not_found')
+        list_id = await conn.fetchval('''SELECT id FROM shopping_lists
+            WHERE owner_id=$1 AND source_memory_id=$2 AND deleted_at IS NULL''', owner, memory_id)
+        return {'item': decoded(await find(conn, owner, list_id)) if list_id else None}
+
+
+@router.post('/memories/{memory_id}/shopping-list', status_code=201)
+async def create_list(memory_id: UUID, request: Request, body: ShoppingCreate | None = None,
+                      who=Depends(principal)):
     owner=who[0]
     async with writing(request,who) as conn:
-        previous = await conn.fetchrow('''SELECT id FROM shopping_lists
-            WHERE owner_id=$1 AND source_memory_id=$2 AND deleted_at IS NULL''',
-            owner,memory_id)
-        if previous:
-            return decoded(await find(conn,owner,previous['id']))
+        # writing() serializes owner writes; lock the source through validation/insert.
         source = await conn.fetchrow('''SELECT * FROM memories
-            WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL''',memory_id,owner)
+            WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL FOR UPDATE''', memory_id, owner)
         if source is None:
             raise Problem(404,'memory_not_found')
-        recipe = next((item for item in eligible_actions(source)
-                       if item['kind']=='shopping'),None)
-        if recipe is None:
-            raise Problem(422,'insufficient_recipe_evidence')
-        ingredients=recipe['evidence_lines']
-        items=[{
-            'id':str(uuid4()),'text':line,'checked':False,
-            'origin':'source','source_quote':line,
-        } for line in ingredients]
+        previous = await conn.fetchrow('''SELECT id FROM shopping_lists
+            WHERE owner_id=$1 AND source_memory_id=$2 AND deleted_at IS NULL''', owner, memory_id)
+        if previous:
+            # A concurrent creation/uncertain retry must not overwrite the saved list.
+            return decoded(await find(conn,owner,previous['id']))
+        if body is not None:
+            items = draft_items(body, source)
+            title = body.title.strip()
+        else:
+            # Backward compatibility for existing clients with no draft body.
+            recipe = next((item for item in eligible_actions(source) if item['kind']=='shopping'),None)
+            if recipe is None:
+                raise Problem(422,'insufficient_recipe_evidence')
+            items=[{'id':str(uuid4()),'text':line,'checked':False,
+                    'origin':'source','source_quote':line} for line in recipe['evidence_lines']]
+            title = 'Shopping list'
         list_id=uuid4()
         await conn.execute('''INSERT INTO shopping_lists
             (id,owner_id,source_memory_id,title,items)
-            VALUES($1,$2,$3,$4,$5::jsonb)''',
-            list_id,owner,memory_id,'Shopping list',json.dumps(items))
+            VALUES($1,$2,$3,$4,$5::jsonb)''', list_id,owner,memory_id,title,json.dumps(items))
         return decoded(await find(conn,owner,list_id))
 
 

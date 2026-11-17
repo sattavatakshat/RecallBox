@@ -83,8 +83,8 @@ export default function TripShortlistScreen(){
     catch{setError('Could not open the saved original.');}
   }
   return <Screen compact>
-    <TextAction icon="back" label="Memory" onPress={()=>record?router.replace({
-      pathname:'/(account)/memory/[id]',params:{id:record.source_memory_id}}):router.back()}/>
+    <TextAction icon="back" label="Memory" onPress={()=>router.canGoBack()?router.back():record?router.replace({
+      pathname:'/(account)/memory/[id]',params:{id:record.source_memory_id}}):router.replace('/(account)')}/>
     <Type variant="eyebrow" muted>PLACES YOU SAVED</Type>
     <Type title>Trip shortlist.</Type>
     <Type muted>Start with actual saved inspiration. Dates and itinerary days are yours to choose.</Type>
