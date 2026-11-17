@@ -6,12 +6,12 @@ import {router, useLocalSearchParams} from 'expo-router';
 import {MemorySummary, memoriesApi} from '../../src/api';
 import {useMemories} from '../../src/memories';
 import {useSession} from '../../src/session';
+import {isUsableMemory} from '../../src/library-state';
+import {SEARCH_QUERY_LIMIT} from '../../src/search-history';
 import {MemoryCard} from '../../src/memory-card';
 
 type Kind = 'all' | 'link' | 'note' | 'image' | 'pdf';
-const usable = (item: MemorySummary) =>
-  item.kind === 'note' || item.processing_state === 'ready' ||
-  item.processing_state === 'metadata_only';
+const usable = isUsableMemory;
 const matches = (item: MemorySummary, kind: Kind) =>
   kind === 'all' || (kind === 'link' ? item.kind === 'link' || item.kind === 'url'
     : item.kind === kind);
@@ -19,7 +19,7 @@ const matches = (item: MemorySummary, kind: Kind) =>
 /** RB-08: real result list, original search retained, no fabricated snippets. */
 export default function Results() {
   const params = useLocalSearchParams<{q?: string}>();
-  const q = typeof params.q === 'string' ? params.q.trim().slice(0,200) : '';
+  const q = typeof params.q === 'string' ? params.q.trim().slice(0,SEARCH_QUERY_LIMIT) : '';
   const {authorized} = useSession();
   const auth = useRef(authorized);auth.current = authorized;
   const store = useMemories();
@@ -85,7 +85,7 @@ export default function Results() {
     Date.parse(b.created_at)-Date.parse(a.created_at)) : filtered;
 
   return <Screen compact>
-    <TextAction icon="back" label="Edit search" onPress={() => router.replace({
+    <TextAction icon="back" label="Edit search" onPress={() => router.dismissTo({
       pathname:'/(account)/search',params:{q}})}/>
     <Type variant="eyebrow" muted>SEARCH RESULTS</Type>
     <Type title>{q ? '“'+q+'”' : 'Your saved things'}</Type>
@@ -105,7 +105,7 @@ export default function Results() {
     {!busy && searched && !error && shown.length===0 && <View style={{gap: tokens.space.compact,marginTop: tokens.space.small}}>
       <Type variant="section">Nothing found here.</Type>
       <Type muted>Try another phrase, a different type, or remove Starred. RecallBox never makes up missing source text.</Type>
-      <Button variant="secondary" label="Edit search" onPress={() => router.replace({
+      <Button variant="secondary" label="Edit search" onPress={() => router.dismissTo({
         pathname:'/(account)/search',params:{q}})}/>
       {kind !== 'all' && <TextAction label="Show all types" onPress={() => setKind('all')}/>}
     </View>}
@@ -114,7 +114,7 @@ export default function Results() {
       onOpen={() => router.push({pathname:'/(account)/memory/[id]',params:{id:item.id}})}
       onStar={() => void toggleStar(item)}/>)}
     <Type muted variant="caption">Results are drawn from your own saved titles, notes and available source text. Restricted links may have limited previews.</Type>
-    {error && <Button variant="secondary" label="Edit search and try again" onPress={() => router.replace({
+    {error && <Button variant="secondary" label="Edit search and try again" onPress={() => router.dismissTo({
       pathname:'/(account)/search',params:{q}})}/>}
   </Screen>;
 }

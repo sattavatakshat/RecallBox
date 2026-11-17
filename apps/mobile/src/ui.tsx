@@ -61,18 +61,32 @@ export function Button({label, onPress, busy = false, disabled = false, variant 
   </Pressable>;
 }
 
-export function Input({label, style, onFocus, onBlur, ...props}: TextInputProps & {label: string}) {
+export type InputHandle = React.ComponentRef<typeof TextInput>;
+export function Input({label, style, onFocus, onBlur, inputRef, hideLabel = false, leading, trailing, rounded = false, ...props}: TextInputProps & {
+  label: string; inputRef?: React.Ref<InputHandle>; hideLabel?: boolean;
+  leading?: React.ReactNode; trailing?: React.ReactNode; rounded?: boolean;
+}) {
   const p = usePalette();
   const typography = useTypeStyle('body');
   const [focused, setFocused] = useState(false);
+  const decorated = rounded || Boolean(leading || trailing);
+  const field = <TextInput {...props} ref={inputRef} accessibilityLabel={label}
+    placeholderTextColor={props.placeholderTextColor ?? p.mutedText} selectionColor={p.brand}
+    onFocus={event => {setFocused(true); onFocus?.(event);}}
+    onBlur={event => {setFocused(false); onBlur?.(event);}}
+    style={[typography, {minHeight: tokens.geometry.buttonHeight, paddingVertical: tokens.space.compact,
+      color: p.primaryText}, decorated ? {flex: 1, minWidth: 0,
+      paddingHorizontal: leading ? tokens.space.compact : tokens.space.none} : {
+      paddingHorizontal: tokens.space.medium, backgroundColor: p.surface, borderWidth: tokens.geometry.divider,
+      borderColor: focused ? p.lineFocused : p.line, borderRadius: tokens.radii.medium}, style]}/>;
   return <View style={{gap: tokens.space.small}}>
-    <Type variant="label">{label}</Type>
-    <TextInput {...props} accessibilityLabel={label} placeholderTextColor={props.placeholderTextColor ?? p.mutedText}
-      selectionColor={p.brand} onFocus={event => {setFocused(true); onFocus?.(event);}}
-      onBlur={event => {setFocused(false); onBlur?.(event);}}
-      style={[typography, {minHeight: tokens.geometry.buttonHeight, paddingHorizontal: tokens.space.medium,
-        paddingVertical: tokens.space.compact, backgroundColor: p.surface, borderWidth: tokens.geometry.divider,
-        borderColor: focused ? p.lineFocused : p.line, borderRadius: tokens.radii.medium, color: p.primaryText}, style]}/>
+    {!hideLabel && <Type variant="label">{label}</Type>}
+    {decorated ? <View style={{flexDirection: 'row', alignItems: 'center', minHeight: tokens.geometry.buttonHeight,
+      paddingHorizontal: tokens.space.medium, backgroundColor: p.surface,
+      borderWidth: focused ? tokens.geometry.strokeWidth : tokens.geometry.divider,
+      borderColor: focused ? p.lineFocused : p.line, borderRadius: rounded ? tokens.radii.full : tokens.radii.medium}}>
+      {leading}{field}{trailing}
+    </View> : field}
   </View>;
 }
 

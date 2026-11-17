@@ -1,6 +1,6 @@
 import {Redirect, Stack, useSegments} from 'expo-router';
-import {useRef} from 'react';
-import {View} from 'react-native';
+import {useEffect, useRef, useState} from 'react';
+import {Keyboard, View} from 'react-native';
 import {useSession} from '../../src/session';
 import {MemoryProvider, useMemories} from '../../src/memories';
 import {BottomNavigation, type Destination} from '../../src/navigation';
@@ -19,6 +19,12 @@ export default function Protected() {
   const {account, loading} = useSession();
   const p = usePalette();
   const segments = useSegments();
+  const [keyboardVisible, setKeyboardVisible] = useState(Keyboard.isVisible());
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {show.remove();hide.remove();};
+  }, []);
   const leaf = segments.length ? String(segments[segments.length - 1]) : '';
   // The primary bar belongs to destinations, not editors, memory details or modals.
   const isHome = leaf === '(account)' || leaf === 'index';
@@ -46,7 +52,7 @@ export default function Protected() {
           contentStyle: {backgroundColor: 'transparent'},
         }}/>
       </Stack>
-      {showTabs && <AccountNavigation active={lastTab.current}/>}
+      {showTabs && !(leaf === 'search' && keyboardVisible) && <AccountNavigation active={lastTab.current}/>}
     </View>
   </MemoryProvider>;
 }

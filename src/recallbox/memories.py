@@ -261,11 +261,11 @@ async def search_memories(request: Request, q: str = Query(default='', max_lengt
         raise Problem(503,'local_embeddings_unavailable')
     async with owned(request.app.state.pool, who[0], readonly=True) as conn:
         if vector:
-            rows = await conn.fetch('''SELECT * FROM memories WHERE deleted_at IS NULL AND embedding IS NOT NULL
+            rows = await conn.fetch(f'''SELECT *,{original_column()} FROM memories WHERE deleted_at IS NULL AND embedding IS NOT NULL
               AND embedding_version=1 AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
               ORDER BY embedding <=> $1::vector LIMIT 20''',vector,collection,starred)
         else:
-            rows = await conn.fetch('''SELECT *, ts_rank_cd(
+            rows = await conn.fetch(f'''SELECT *,{original_column()}, ts_rank_cd(
             to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text), plainto_tsquery('english',$1)) AS rank
             FROM memories WHERE deleted_at IS NULL AND ($1='' OR
               to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text) @@ plainto_tsquery('english',$1)
