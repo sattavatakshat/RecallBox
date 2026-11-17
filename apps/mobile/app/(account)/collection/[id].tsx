@@ -54,7 +54,7 @@ export default function CollectionScreen() {
         setBusy(true); setError('');
         try {
           await auth.current(access => collectionsApi.remove(access, id, data.version));
-          router.replace('/(account)/collections');
+          router.dismissTo('/(account)/collections');
         } catch {
           setError('Removal could not be confirmed. Refresh and try again.');
         } finally { setBusy(false); }
@@ -98,7 +98,7 @@ export default function CollectionScreen() {
   }
 
   return <Screen>
-    <TextAction label="Back to collections" onPress={() => router.replace('/(account)/collections')}/>
+    <TextAction label="Back to collections" onPress={() => router.dismissTo('/(account)/collections')}/>
     <Type variant="eyebrow" muted>YOUR COLLECTION</Type>
     <Type title>{data?.name ? data.name + '.' : 'Your collection.'}</Type>
     <Type muted>Memories you chose to keep together, without automatic folders.</Type>

@@ -1,101 +1,126 @@
-import {LoadingIndicator, Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../src/ui';
-import {tokens} from '../../src/theme';
-import {Icon} from '../../src/icons';
-import {useCallback, useRef, useState} from 'react';
-import {Pressable, View} from 'react-native';
+import {useCallback, useRef, useState, type ComponentRef} from 'react';
+import {AccessibilityInfo, findNodeHandle, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View} from 'react-native';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {router, useFocusEffect} from 'expo-router';
-import {ApiError, Collection, collectionsApi} from '../../src/api';
+import {Collection, collectionsApi} from '../../src/api';
 import {useSession} from '../../src/session';
+import {AppHeader} from '../../src/navigation-ui';
+import {CollectionCreationForm} from '../../src/collection-creation';
+import {Button, Divider, Icon, LoadingIndicator, Notice, SheetSurface, Type, tokens, usePalette} from '../../src/ui';
 
 export default function Collections() {
-  const {authorized} = useSession();
-  const auth = useRef(authorized);auth.current = authorized;
+  const {account} = useSession();
+  // Account-keyed state also protects against a direct switch between signed-in users.
+  return <CollectionsHub key={account?.id}/>;
+}
+function CollectionsHub() {
+  const {account, authorized} = useSession();
+  const auth = useRef(authorized); auth.current = authorized;
   const p = usePalette();
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Collection[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const pendingCollectionName = useRef<string | null>(null);
+  const [creationBusy, setCreationBusy] = useState(false);
+  const creationLock = useRef(false);
+  const restoreFocus = useRef(false);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-
+  const fetching = useRef(false);
+  const refreshedAt = useRef(0);
+  const changed = useRef(false);
+  const trigger = useRef<ComponentRef<typeof Pressable>>(null);
   const refresh = useCallback(async () => {
-    setLoading(true);setError('');
+    if (fetching.current) return;
+    fetching.current = true; setLoading(true); setError('');
     try {
-      const page=await auth.current(access => collectionsApi.list(access));
-      setItems(page.items);setHasMore(page.has_more);
-    } catch {
-      setError('Could not load your collections. Check your connection and try again.');
-    } finally {setLoading(false);}
+      const page = await auth.current(access => collectionsApi.list(access));
+      setItems(page.items); setHasMore(page.has_more); setLoaded(true);
+      refreshedAt.current = Date.now(); changed.current = false;
+    } catch {setError('Could not load your collections. Check your connection and try again.');}
+    finally {fetching.current = false; setLoading(false);}
   }, []);
-  useFocusEffect(useCallback(() => {void refresh();}, [refresh]));
-
-  async function create() {
-    const value=name.trim();
-    if (!value || busy) return;
-    setBusy(true);setError('');setNotice('');
-    try {
-      const result=await auth.current(access=>collectionsApi.create(access,value));
-      setName('');setCreating(false);
-      setItems(previous=>[result,...previous.filter(item=>item.id!==result.id)]);
-      router.push({pathname:'/(account)/collection/[id]',params:{id:result.id}});
-    } catch (cause) {
-      setError(cause instanceof ApiError && cause.code==='collection_name_exists'
-        ? 'A collection with that name already exists. Choose another name.'
-        : 'Collection save was not confirmed. Check the list before retrying.');
-    } finally {setBusy(false);}
+  useFocusEffect(useCallback(() => {
+    if (changed.current || Date.now() - refreshedAt.current > 30_000) void refresh();
+  }, [refresh]));
+  function open(item: Collection) {
+    restoreFocus.current = false;
+    changed.current = true;
+    router.navigate({pathname: '/(account)/collection/[id]', params: {id: item.id}});
   }
-
-  return <Screen compact>
-    <Type title>Collections.</Type>
-    <Type muted>The things you have gathered for a reason.</Type>
-    <Button label={creating ? 'Close new collection' : '＋ New collection'}
-      variant={creating ? 'secondary' : 'primary'}
-      onPress={()=>{setCreating(current=>!current);setError('');}}/>
-    {creating && <View style={{gap: tokens.space.compact,padding: tokens.space.medium,borderRadius: tokens.radii.medium,backgroundColor:p.surface}}>
-      <Type variant="section">Name your collection</Type>
-      <Input label="Collection name" value={name} onChangeText={setName} maxLength={80}
-        autoFocus placeholder="Weekend places, Java notes…"/>
-      <Button label="Create collection" busy={busy} disabled={!name.trim()}
-        onPress={()=>void create()}/>
-      <TextAction label="Cancel" disabled={busy} onPress={()=>{setCreating(false);setName('');}}/>
-    </View>}
-    {!!error && <Notice kind="error">{error}</Notice>}
-    {!!notice && <Notice>{notice}</Notice>}
-    <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-      <Type variant="section">Your collections</Type>
-      <TextAction label="Refresh" disabled={loading||busy} onPress={()=>void refresh()}/>
-    </View>
-    {loading && <LoadingIndicator accessibilityLabel="Loading collections" color={p.ink}/>}
-    {!loading && !error && items.length===0 && <View style={{gap: tokens.space.small,paddingVertical: tokens.space.sectionSmall}}>
-      <Type variant="section">Start a collection.</Type>
-      <Type muted>Group saved places, recipes or articles whenever it helps you find them again.</Type>
-      <TextAction label="Create your first collection" onPress={()=>setCreating(true)}/>
-    </View>}
-    {!!error && items.length>0 &&
-      <Notice>Showing previously loaded collections. Refresh to check recent changes.</Notice>}
-    {items.map(item=><Pressable key={item.id} accessibilityRole="button"
-      accessibilityLabel={`Open collection ${item.name}`}
-      onPress={()=>router.push({pathname:'/(account)/collection/[id]',params:{id:item.id}})}
-      style={({pressed})=>({minHeight:83,flexDirection:'row',gap: tokens.space.compact,alignItems:'center',
-        paddingVertical: tokens.space.compact,borderBottomWidth:1,borderBottomColor:p.line,
-        opacity:pressed?0.65:1})}>
-      <View importantForAccessibility="no-hide-descendants" style={{
-        width:64,height:64,borderRadius: tokens.radii.tile,alignItems:'center',justifyContent:'center',
-        backgroundColor:p.surfaceMuted}}>
-        <View style={{width:24,height:19,alignItems:'center',justifyContent:'center'}}>
-          <View style={{position:'absolute',top:1,width:19,height:9,borderWidth:2,borderColor:p.accent,borderRadius: tokens.radii.tiny,transform:[{rotate:'-9deg'}]}}/>
-          <View style={{position:'absolute',top:7,width:21,height:11,borderWidth:2,borderColor:p.accent,borderRadius: tokens.radii.tiny,backgroundColor:p.surfaceMuted}}/>
-        </View>
-      </View>
-      <View style={{flex:1,gap: tokens.space.tiny}}>
-        <Type variant="label" numberOfLines={2}>{item.name}</Type>
-        <Type muted variant="caption">{item.item_count ?? 0} saved {item.item_count===1?'item':'items'}</Type>
-      </View>
-      <Icon name="chevron" color={p.mutedText}/>
-    </Pressable>)}
-    {hasMore && <Notice>Showing the newest 100 collections. Your older collections remain saved.</Notice>}
-    <Type muted variant="caption">These are intentional, user-created collections. Topic filters in Library are not permanent folders.</Type>
-  </Screen>;
+  function close() {
+    if (creationLock.current) return;
+    restoreFocus.current = true;
+    setCreating(false); // Preserve the draft on cancellation, including uncertain outcomes.
+    requestAnimationFrame(() => {
+      const target = findNodeHandle(trigger.current);
+      if (target) AccessibilityInfo.setAccessibilityFocus(target);
+    });
+  }
+  const empty = loaded && !loading && !error && items.length === 0;
+  const newCollection = <Button buttonRef={trigger} label="New collection" variant="secondary" size="compact" onPress={() => setCreating(true)}
+      leading={<Icon name="save" color={p.accent}/>}
+      labelStyle={{color: p.accent}} style={{backgroundColor: 'transparent', borderColor: p.lineFocused,
+        borderRadius: tokens.radii.full, paddingHorizontal: tokens.space.compact, paddingVertical: tokens.space.small}}/>;
+  return <SafeAreaView edges={['top', 'left', 'right']} style={{flex: 1, backgroundColor: p.background}}>
+    <FlatList data={items} keyExtractor={item => item.id} initialNumToRender={12}
+      contentContainerStyle={{paddingHorizontal: tokens.geometry.screenPadding, paddingTop: tokens.space.regular,
+        paddingBottom: tokens.geometry.listBottomClearance, maxWidth: tokens.width, width: '100%', alignSelf: 'center', flexGrow: 1}}
+      refreshing={loading && loaded} onRefresh={() => void refresh()}
+      ItemSeparatorComponent={() => <Divider inset={tokens.geometry.thumbnail + tokens.space.regular}/>}
+      ListHeaderComponent={<View>
+        <AppHeader name={account?.display_name} onAccount={() => router.navigate('/(account)/account')}/>
+        <Type variant="display" style={{marginTop: tokens.space.large}}>Collections.</Type>
+        <Type variant="intro" style={{color: p.mutedText, marginTop: tokens.space.small}}>The things you keep together.</Type>
+        {!empty && <View style={{flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
+          gap: tokens.space.small, marginTop: tokens.space.sectionSmall, marginBottom: tokens.space.small}}>
+          <Type variant="section">Your collections</Type>{newCollection}
+        </View>}
+        {!loaded && loading && <View style={{padding: tokens.space.large}}><LoadingIndicator label="Loading collections"/></View>}
+        {!!error && <View style={{gap: tokens.space.small, paddingVertical: tokens.space.medium}}>
+          <Notice kind="error">{error}</Notice>
+          {items.length > 0 && <Notice>Showing previously confirmed collections. The list may be outdated.</Notice>}
+          <Button label="Try again" variant="secondary" disabled={loading} onPress={() => void refresh()}/>
+        </View>}
+      </View>}
+      ListEmptyComponent={empty ? <View style={{paddingVertical: tokens.space.section, gap: tokens.space.medium}}>
+        <Type variant="section">Keep related things together.</Type>
+        <Type muted>Create a collection for the things you're planning, learning, or want to revisit.</Type>
+        <Button buttonRef={trigger} label="Create your first collection" onPress={() => setCreating(true)}/>
+      </View> : undefined}
+      renderItem={({item}) => {
+        const count = typeof item.item_count === 'number' ? `${item.item_count} saved ${item.item_count === 1 ? 'item' : 'items'}` : '';
+        return <Pressable accessibilityRole="button" accessibilityLabel={`${item.name}${count ? `, ${count}` : ''}. Open collection.`}
+          onPress={() => open(item)} style={({pressed}) => ({minHeight: tokens.geometry.sheetActionHeight,
+            flexDirection: 'row', alignItems: 'center', gap: tokens.space.regular, paddingVertical: tokens.space.compact, opacity: pressed ? 0.7 : 1})}>
+          <View style={{width: tokens.geometry.thumbnail, height: tokens.geometry.thumbnail, borderRadius: tokens.radii.tile,
+            backgroundColor: p.iconSurface, alignItems: 'center', justifyContent: 'center'}}>
+            <Icon name="collections" color={p.brand} size={tokens.geometry.iconLarge}/>
+          </View>
+          <View style={{flex: 1, gap: tokens.space.tiny}}><Type variant="actionTitle">{item.name}</Type>
+            {!!count && <Type variant="secondary" style={{color: p.mutedText}}>{count}</Type>}</View>
+          <Icon name="chevron"/>
+        </Pressable>;
+      }}
+      ListFooterComponent={hasMore ? <Notice>Showing the newest 100 collections. Older collections remain saved; this list is incomplete.</Notice> : undefined}/>
+    <Modal transparent visible={creating} animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={close}
+      onDismiss={() => {if (!restoreFocus.current) return; const target = findNodeHandle(trigger.current); if (target) AccessibilityInfo.setAccessibilityFocus(target);}}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{flex: 1, justifyContent: 'flex-end', backgroundColor: p.scrim, paddingTop: insets.top + tokens.space.small}}>
+        <Pressable accessible={false} style={{position: 'absolute', top: 0, bottom: 0, left: 0, right: 0}} onPress={close}/>
+        <SheetSurface style={{flexShrink: 1}}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: tokens.geometry.screenPadding,
+            paddingBottom: insets.bottom + tokens.space.large, gap: tokens.space.medium}}>
+            <Type variant="sheetHeading">New collection</Type>
+            <CollectionCreationForm pendingName={pendingCollectionName} active={creating} name={name} onChangeName={setName} disabled={creationBusy}
+              onBusyChange={value => {creationLock.current = value; setCreationBusy(value);}}
+              onCancel={close} onCreated={item => {setName(''); setCreating(false); open(item);}}/>
+          </ScrollView>
+        </SheetSurface>
+      </KeyboardAvoidingView>
+    </Modal>
+  </SafeAreaView>;
 }

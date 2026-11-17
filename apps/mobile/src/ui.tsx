@@ -36,15 +36,15 @@ export function LoadingIndicator({label = 'Loading', color, ...props}: React.Com
 }
 type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
 export function Button({label, onPress, busy = false, disabled = false, variant = 'primary',
-  leading, size = 'default', style, labelStyle, accessibilityLabel}: {
+  leading, size = 'default', style, labelStyle, accessibilityLabel, buttonRef}: {
   label: string; onPress: () => void; busy?: boolean; disabled?: boolean; variant?: ButtonVariant;
   leading?: React.ReactNode; size?: 'default' | 'hero' | 'compact'; style?: StyleProp<ViewStyle>;
-  labelStyle?: StyleProp<TextStyle>; accessibilityLabel?: string;
+  labelStyle?: StyleProp<TextStyle>; accessibilityLabel?: string; buttonRef?: React.Ref<React.ComponentRef<typeof Pressable>>;
 }) {
   const p = usePalette();
   const primary = variant === 'primary', quiet = variant === 'quiet';
   const foreground = primary ? p.onButton : variant === 'danger' ? p.error : p.primaryText;
-  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label}
+  return <Pressable ref={buttonRef} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label}
     accessibilityState={{disabled: disabled || busy, busy}} disabled={disabled || busy} onPress={onPress}
     style={({pressed}) => [{minHeight: size === 'hero' ? tokens.geometry.heroButtonHeight :
       size === 'compact' || quiet ? tokens.touch : tokens.geometry.buttonHeight,

@@ -1,3 +1,4 @@
+import {CollectionCreationForm} from '../../src/collection-creation';
 import {tokens} from '../../src/theme';
 import {Icon} from '../../src/icons';
 import {useCallback, useRef, useState} from 'react';
@@ -29,13 +30,17 @@ export default function OrganizeMemory() {
   const [savedMembership,setSavedMembership]=useState<string[]>([]);
   const [selectedMembership,setSelectedMembership]=useState<string[]>([]);
   const [collectionError,setCollectionError]=useState('');
+  const [creating,setCreating]=useState(false);
+  const pendingCollectionName = useRef<string | null>(null);
+  const [collectionName,setCollectionName]=useState('');
   const chosenTopic=topic==='Uncategorized'?null:(topic??memory?.suggested_topic??null);
   const detailsChanged=Boolean(memory && (topic!==(memory.topic_override??null)||
     !equal(tags,memory.tags_override)));
   const membershipChanged=JSON.stringify([...selectedMembership].sort()) !==
     JSON.stringify([...savedMembership].sort());
-  const dirty=detailsChanged||membershipChanged;
-  const release=usePreventRemove(dirty&&!leaving,({repeat})=>{
+  const dirty=detailsChanged||membershipChanged||Boolean(collectionName.trim());
+  const release=usePreventRemove((dirty||busy)&&!leaving,({repeat})=>{
+    if(busy)return;
     Alert.alert('Discard changes?','Your organization changes have not been saved.',[
       {text:'Keep editing',style:'cancel'},
       {text:'Discard changes',style:'destructive',onPress:()=>{
@@ -79,6 +84,7 @@ export default function OrganizeMemory() {
   }
   async function save(){
     if(!memory||busy||!dirty)return;
+    if(collectionName.trim()){setError('Create or cancel the new collection before saving.');return;}
     setBusy(true);setError('');
     try{
       if(detailsChanged) {
@@ -172,6 +178,16 @@ export default function OrganizeMemory() {
       {!allCollections.length&&!collectionError&&<Type muted variant="caption">
         You haven't created any collections yet.
       </Type>}
+      {!creating&&<TextAction label="New collection" icon="save" disabled={busy||!!collectionError}
+        onPress={()=>setCreating(true)}/>}
+      <CollectionCreationForm pendingName={pendingCollectionName} active={creating} name={collectionName} onChangeName={setCollectionName}
+        disabled={busy} onBusyChange={setBusy}
+        onCancel={()=>{setCreating(false);setCollectionName('');}}
+        onCreated={result=>{
+          setAllCollections(current=>[result,...current.filter(item=>item.id!==result.id)]);
+          setSelectedMembership(current=>[...new Set([...current,result.id])]);
+          setCollectionName('');setCreating(false);
+        }}/>
       <TextAction label="Manage collections" disabled={busy||dirty}
         onPress={()=>router.push('/(account)/collections')}/>
       <Button label="Save organization" busy={busy} disabled={!dirty} onPress={()=>void save()}/>
