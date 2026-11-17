@@ -20,7 +20,7 @@ export function FloatingSaveButton({bottom}: {bottom: number}) {
   </Pressable>;
 }
 /** approved remains accepted for compatibility; all destinations now use one theme. */
-export function BottomNavigation({active, showSave = true}: {active: Destination; showSave?: boolean; approved?: boolean}) {
+export function BottomNavigation({active, showSave = true, onActivePress}: {onActivePress?: () => void; active: Destination; showSave?: boolean; approved?: boolean}) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const [barHeight, setBarHeight] = useState(tokens.geometry.navHeight);
@@ -35,7 +35,7 @@ export function BottomNavigation({active, showSave = true}: {active: Destination
         {tabs.map(tab => {
           const selected = active === tab.key;
           return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={tab.label} accessibilityState={{selected}}
-            onPress={() => {if (!selected) navigate(tab.key);}} style={{flex: 1, minHeight: tokens.touch,
+            onPress={() => {if (!selected) navigate(tab.key); else onActivePress?.();}} style={{flex: 1, minHeight: tokens.touch,
               alignItems: 'center', justifyContent: 'center', gap: tokens.space.tiny}}>
             {({pressed}) => <>
               <View style={{minHeight: tokens.space.sectionSmall, width: '85%', maxWidth: 88, borderRadius: tokens.radii.full,

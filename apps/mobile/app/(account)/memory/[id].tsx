@@ -12,7 +12,7 @@ import {errorMessage, useMemories} from '../../../src/memories';
 import {Button, Input, Notice, Screen, TextAction, Type, usePalette} from '../../../src/ui';
 
 export default function MemoryDetail() {
-  const {id, saved} = useLocalSearchParams<{id: string; saved?: string}>();
+  const {id, saved, fromSearch} = useLocalSearchParams<{id: string; saved?: string; fromSearch?: string}>();
   const store = useMemories();
   const p = usePalette();
   const {authorized} = useSession();
@@ -152,7 +152,8 @@ export default function MemoryDetail() {
       : base?.kind === 'pdf' ? 'Saved document'
       : base?.kind === 'image' ? 'Saved photo' : 'Saved source';
   return <Screen compact>
-    <TextAction icon="back" label="Library" onPress={() => router.dismissTo('/(account)')}/>
+    <TextAction icon="back" label={fromSearch === '1' ? 'Search results' : 'Library'}
+      onPress={() => fromSearch === '1' && router.canGoBack() ? router.back() : router.dismissTo('/(account)')}/>
     {base && <View importantForAccessibility="no-hide-descendants" style={{
       height:156,borderRadius: tokens.radii.large,backgroundColor:p.surfaceMuted,
       alignItems:'center',justifyContent:'center'}}>

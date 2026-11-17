@@ -1,4 +1,4 @@
-import {Redirect, Stack, useSegments} from 'expo-router';
+import {Redirect, Stack, router, useSegments} from 'expo-router';
 import {useEffect, useRef, useState} from 'react';
 import {Keyboard, View} from 'react-native';
 import {useSession} from '../../src/session';
@@ -8,11 +8,12 @@ import {Notice, Screen, usePalette} from '../../src/ui';
 
 export const unstable_settings = {initialRouteName:'index'};
 
-function AccountNavigation({active}: {active: Destination}) {
+function AccountNavigation({active, results}: {active: Destination; results: boolean}) {
   const store = useMemories();
   const emptyLibrary = active === 'library' && !store.archived && !store.starredOnly &&
     !store.topic && !store.items.length;
-  return <BottomNavigation active={active} showSave={!emptyLibrary} approved={active === 'library'}/>;
+  return <BottomNavigation active={active} showSave={!emptyLibrary} approved={active === 'library'}
+    onActivePress={results ? () => router.dismissTo('/(account)/search') : undefined}/>;
 }
 
 export default function Protected() {
@@ -52,7 +53,7 @@ export default function Protected() {
           contentStyle: {backgroundColor: 'transparent'},
         }}/>
       </Stack>
-      {showTabs && !(leaf === 'search' && keyboardVisible) && <AccountNavigation active={lastTab.current}/>}
+      {showTabs && !(isSearch && keyboardVisible) && <AccountNavigation active={lastTab.current} results={leaf === 'results'}/>}
     </View>
   </MemoryProvider>;
 }

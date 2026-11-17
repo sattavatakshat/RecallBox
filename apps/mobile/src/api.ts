@@ -35,7 +35,8 @@ export type Memory = {
   topic_override?: string | null; tags_override?: string[] | null;
   suggested_topic?: string | null; suggested_topic_reason?: string | null;
 };
-export type MemorySummary = Omit<Memory, 'content'> & {preview: string};
+export type SearchEvidence = {field: string; segments: {text: string; matched: boolean}[]};
+export type MemorySummary = Omit<Memory, 'content'> & {preview: string; match_evidence?: SearchEvidence | null};
 export type MemoryPage = {items: MemorySummary[]; next_cursor: string | null; sync_cursor: string};
 export type MemoryCreate = {title: string; content: string; kind?: 'note' | 'link'};
 export type MemoryEdit = {expected_version: number; title?: string; content?: string; starred?: boolean; archived?: boolean; collection?: string; topic_override?: string | null; tags_override?: string[] | null};
@@ -59,8 +60,8 @@ export const memoriesApi = {
     }
     return response.json();
   },
-  search: (access: string, q: string, mode='keyword', collection?: string, starred=false) => request<{items: MemorySummary[]; pending_index: number}>(
-    `/search?q=${encodeURIComponent(q)}&mode=${mode}&starred=${starred}${collection ? `&collection=${encodeURIComponent(collection)}`:''}`, 'GET', undefined, access),
+  search: (access: string, q: string, mode='keyword', collection?: string, starred=false, kind='all', order='best') => request<{items: MemorySummary[]; pending_index: number; limited?: boolean}>(
+    `/search?q=${encodeURIComponent(q)}&mode=${mode}&starred=${starred}&kind=${kind}&order=${order}${collection ? `&collection=${encodeURIComponent(collection)}`:''}`, 'GET', undefined, access),
   collections: (access: string) => request<{items:{collection:string;count:number}[]}>('/collection-labels','GET',undefined,access),
   topics: (access: string) => request<{items: {topic: string; count: number}[]}>('/memory-topics', 'GET', undefined, access),
   list: (access: string, archived: boolean, cursor?: string, starredOnly = false, topic: string | null = null, order: 'newest' | 'oldest' = 'newest') => request<MemoryPage>(

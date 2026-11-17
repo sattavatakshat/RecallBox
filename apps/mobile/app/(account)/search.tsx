@@ -30,23 +30,22 @@ export default function Search() {
 
   useEffect(() => {
     alive.current = true;
-    let current = true;
-    setHistory([]);setLoading(true);setLoadError(false);setError('');
-    if (account) void searchHistory.load(account.id).then(items => {
-      if (current) setHistory(items);
-    }).catch(() => {
-      if (current) setLoadError(true);
-    }).finally(() => {if (current) setLoading(false);});
-    return () => {current = false;alive.current = false;};
+    return () => {alive.current = false;};
   }, [account?.id]);
 
   useFocusEffect(useCallback(() => {
     focused.current = true;
+    let current = true;
+    setHistory([]);setLoading(true);setLoadError(false);
+    if (account) void searchHistory.load(account.id).then(items => {
+      if (current) setHistory(items);
+    }).catch(() => {if (current) setLoadError(true);})
+      .finally(() => {if (current) setLoading(false);});
     attempt.current += 1;
     submitting.current = false;
     const frame = requestAnimationFrame(() => input.current?.focus());
-    return () => {focused.current = false;attempt.current += 1;cancelAnimationFrame(frame);input.current?.blur();};
-  }, []));
+    return () => {current = false;focused.current = false;attempt.current += 1;cancelAnimationFrame(frame);input.current?.blur();};
+  }, [account?.id]));
 
   async function submit(value = query) {
     const q = value.trim().slice(0, SEARCH_QUERY_LIMIT);

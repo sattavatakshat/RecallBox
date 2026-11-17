@@ -1,6 +1,7 @@
 """S2 plain-text notes. All persistence/revisions/events share an owner transaction."""
 import hashlib
 import json
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -249,32 +250,88 @@ async def memory_topics(request: Request, who=Depends(principal)):
         return {'items': [dict(row) for row in rows]}
 
 
+def search_evidence(row, query):
+    """Bounded actual indexed text, with literal matches only; never HTML.
+
+    Segments avoid converting Python code point offsets to native UTF-16 offsets.
+    Stemming-only and semantic matches need not have literal highlights.
+    """
+    terms = sorted(set(re.findall(r'\w+', query, re.UNICODE)), key=len, reverse=True)
+    pattern = re.compile(r'(?<!\w)(?:' + '|'.join(re.escape(term) for term in terms) + r')(?!\w)', re.IGNORECASE) if terms else None
+    fields = [('title', row['title']), ('source_url' if row['kind'] in ('url', 'link') else 'user_note', row['user_note']),
+              ('extracted_text', row['extracted_text']), ('source_url', row['source_url']),
+              ('collection', row['collection']), ('labels', ' '.join(row['labels'] or [])),
+              ('topic_override', row['topic_override']),
+              ('tags_override', ' '.join(row['tags_override'] or []))]
+    # Prefer a field containing the submitted phrase before isolated words.
+    phrase = re.compile(re.escape(query), re.IGNORECASE) if query else None
+    fields.sort(key=lambda pair: not bool(phrase and phrase.search(pair[1] or '')))
+    for field, value in fields:
+        match = pattern.search(value or '') if pattern else None
+        if not match:
+            continue
+        start = 0 if field == 'title' else max(0, match.start() - 55)
+        length = 240 if field == 'title' else 220
+        text = value[start:start + length]
+        text = ('…' if start else '') + text + ('…' if start + length < len(value) else '')
+        parts, previous = [], 0
+        for hit in pattern.finditer(text):
+            if hit.start() > previous:
+                parts.append({'text': text[previous:hit.start()], 'matched': False})
+            parts.append({'text': hit.group(), 'matched': True})
+            previous = hit.end()
+        if previous < len(text):
+            parts.append({'text': text[previous:], 'matched': False})
+        return {'field': field, 'segments': parts}
+    for field in ('user_note', 'extracted_text'):
+        if row[field] and not (field == 'user_note' and row['kind'] in ('url', 'link')):
+            value = row[field]
+            return {'field': field, 'segments': [{'text': value[:220] + ('…' if len(value) > 220 else ''), 'matched': False}]}
+    return None
+
+
 @router.get('/search')
 async def search_memories(request: Request, q: str = Query(default='', max_length=200),
                           mode: str = Query(default='keyword',pattern='^(keyword|semantic)$'),
                           collection: str | None = Query(default=None,max_length=80), starred: bool = False,
-                          who=Depends(principal)):
+                          kind: Literal['all', 'link', 'note', 'image', 'pdf'] = 'all',
+                          order: Literal['best', 'newest'] = 'best', who=Depends(principal)):
     if not q.strip() and collection is None and not starred:
         raise Problem(422, 'empty_query')
     vector = await embed(q) if mode=='semantic' and q.strip() else None
     if mode=='semantic' and q.strip() and vector is None:
         raise Problem(503,'local_embeddings_unavailable')
+    # Explicit owner predicate supplements mandatory transaction-scoped RLS.
+    filters = """owner_id=$4 AND deleted_at IS NULL
+        AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
+        AND ($5::text='all' OR kind=$5 OR ($5='link' AND kind='url'))
+        AND (kind NOT IN ('image','pdf') OR EXISTS(SELECT 1 FROM capture_assets a
+            WHERE a.memory_id=memories.id AND a.owner_id=memories.owner_id))"""
     async with owned(request.app.state.pool, who[0], readonly=True) as conn:
         if vector:
-            rows = await conn.fetch(f'''SELECT *,{original_column()} FROM memories WHERE deleted_at IS NULL AND embedding IS NOT NULL
-              AND embedding_version=1 AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
-              ORDER BY embedding <=> $1::vector LIMIT 20''',vector,collection,starred)
+            # Semantic candidates remain relevance bounded under Newest.
+            rows = await conn.fetch(f'''SELECT *,{original_column()} FROM memories WHERE {filters}
+              AND embedding IS NOT NULL AND embedding_version=1
+              ORDER BY embedding <=> $1::vector,created_at DESC,id DESC LIMIT 21''',
+              vector,collection,starred,who[0],kind)
         else:
+            ordering = 'created_at DESC,id DESC' if order == 'newest' else 'rank DESC,created_at DESC,id DESC'
             rows = await conn.fetch(f'''SELECT *,{original_column()}, ts_rank_cd(
             to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text), plainto_tsquery('english',$1)) AS rank
-            FROM memories WHERE deleted_at IS NULL AND ($1='' OR
+            FROM memories WHERE {filters} AND ($1='' OR
               to_tsvector('english',title || ' ' || user_note || ' ' || extracted_text) @@ plainto_tsquery('english',$1)
-              OR strpos(lower(title || ' ' || user_note || ' ' || extracted_text || ' ' || collection || ' ' || array_to_string(labels,' ') || ' ' || coalesce(topic_override,'') || ' ' ||
-              coalesce(array_to_string(tags_override,' '),'')),lower($1))>0)
-            AND ($2::text IS NULL OR collection=$2) AND (NOT $3::bool OR starred)
-            ORDER BY rank DESC,updated_at DESC,id DESC LIMIT 50''', q.strip(),collection,starred)
-        pending = await conn.fetchval('SELECT count(*) FROM memories WHERE deleted_at IS NULL AND embedding IS NULL')
-    return {'items': [memory(row, detail=False) for row in rows], 'mode':mode,'pending_index':pending}
+              OR strpos(lower(concat_ws(' ',title,user_note,extracted_text,source_url,collection,
+                array_to_string(labels,' '),topic_override,array_to_string(tags_override,' '))),lower($1))>0)
+            ORDER BY {ordering} LIMIT 51''', q.strip(),collection,starred,who[0],kind)
+        pending = await conn.fetchval('SELECT count(*) FROM memories WHERE owner_id=$1 AND deleted_at IS NULL AND embedding IS NULL', who[0])
+    limit = 20 if vector else 50
+    items = []
+    for row in rows[:limit]:
+        item = memory(row, detail=False)
+        item['match_evidence'] = search_evidence(row, q.strip())
+        items.append(item)
+    return {'items': items, 'mode':mode, 'pending_index':pending,
+            'limited':len(rows) > limit, 'limit':limit}
 
 
 @router.get('/collection-labels')

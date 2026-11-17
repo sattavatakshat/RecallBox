@@ -14,6 +14,7 @@ type Store = {
   remove: (id: string, version: number) => Promise<void>;
   finishCapture: (memory: Memory) => Promise<void>;
   captureRevision: number;
+  peek: (id: string) => MemorySummary | null | undefined;
 };
 const Context = createContext<Store | null>(null);
 export function useMemories() {
@@ -41,6 +42,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   const {authorized} = useSession();
   const auth = useRef(authorized); auth.current = authorized;
   const alive = useRef(true);
+  const removed = useRef(new Set<string>());
   const records = useRef(new Map<string, MemorySummary>());
   const pageCursor = useRef<string | null>(null);
   const syncCursor = useRef<string | null>(null);
@@ -152,7 +154,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
             const page = await auth.current(token => memoriesApi.sync(token, syncCursor.current!));
             if (!alive.current) return false;
             for (const change of page.changes) {
-              if (change.operation === 'delete') records.current.delete(change.id);
+              if (change.operation === 'delete') {records.current.delete(change.id);removed.current.add(change.id);}
               else merge(change.memory);
             }
             syncCursor.current = page.next_cursor;
@@ -178,7 +180,12 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
       polling.current = false;
     }
   }, [run]);
-  const get = useCallback((id: string) => run(() => auth.current(token => memoriesApi.get(token, id))), [run]);
+  const peek = useCallback((id: string) => removed.current.has(id) ? null : records.current.get(id), []);
+  const get = useCallback((id: string) => run(async () => {
+    const note = await auth.current(token => memoriesApi.get(token, id));
+    if (alive.current) {merge(summary(note));publish();}
+    return note;
+  }), [run]);
   const create = useCallback((body: MemoryCreate, key: string) => run(async () => {
     const note = await auth.current(token => memoriesApi.create(token, body, key));
     if (alive.current) { merge(summary(note)); publish(); }
@@ -191,7 +198,7 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
   }), [run]);
   const remove = useCallback((id: string, version: number) => run(async () => {
     await auth.current(token => memoriesApi.remove(token, id, version));
-    if (alive.current) { records.current.delete(id); publish(); }
+    if (alive.current) { records.current.delete(id); removed.current.add(id); publish(); }
   }), [run]);
   const finishCapture = useCallback(async (memory: Memory) => {
     if (!alive.current) throw new ApiError(401, 'session_changed');
@@ -218,5 +225,5 @@ export function MemoryProvider({children}: React.PropsWithChildren) {
     const timer = setInterval(() => { if (AppState.currentState === 'active') void sync(); }, 30000);
     return () => { alive.current = false; records.current.clear(); syncCursor.current = null; pageCursor.current = null; listener.remove(); clearInterval(timer); if(confirmationTimer.current)clearTimeout(confirmationTimer.current); };
   }, [refresh, sync]);
-  return <Context.Provider value={{topic, order, topics, items, archived, starredOnly, initialized, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove, finishCapture, captureRevision}}>{children}</Context.Provider>;
+  return <Context.Provider value={{peek, topic, order, topics, items, archived, starredOnly, initialized, loading, error, notice, hasMore, refresh, more, sync, get, create, edit, remove, finishCapture, captureRevision}}>{children}</Context.Provider>;
 }
